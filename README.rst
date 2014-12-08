@@ -48,12 +48,11 @@ be appended by the extension.
 List of functions
 -----------------
 
-get_autologin(user_id, key)
-+++++++++++++++++++++++++++
+get_autologin(key)
+++++++++++++++++++
 
-Checks if specific user_id - key pair exists and returns user data. It is the
-choice of website developer if autologin should be trusted without sending the user
-to phpBB3 board.
+Checks if specific autologin key exists and returns user data. This method does not
+contain validity checks if using direct access approach.
 
 get_session(session_id)
 +++++++++++++++++++++++

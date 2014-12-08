@@ -54,8 +54,7 @@ class PhpBB3(object):
     self._functions.update(dict(
       get_autologin = "SELECT u.* "
                       "FROM {TABLE_PREFIX}users u, {TABLE_PREFIX}sessions_keys k "
-                      "WHERE u.user_id = %(user_id)d "
-                        "AND u.user_id IN (0, 3)" # FIXME Make it prettier, USER_NORMAL and USER_FOUNDER
+                      "WHERE u.user_type IN (0, 3)" # FIXME Make it prettier, USER_NORMAL and USER_FOUNDER
                         "AND k.user_id = u.user_id"
                         "AND k.key_id = %(key)s",
       get_session   = "SELECT * "
