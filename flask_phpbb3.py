@@ -91,7 +91,7 @@ class PhpBB3(object):
     c.close()
     return output
 
-  def __getattribute__(self, name):
+  def __getattr__(self, name):
     if name not in self._functions:
       raise AttributeError("Function {} does not exist, use register_function, to add it.".format(name))
     func = self._functions[name]
