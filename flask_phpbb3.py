@@ -111,4 +111,4 @@ class PhpBB3(object):
   def teardown(self, exception):
     ctx = stack.top
     if hasattr(ctx, 'phphbb3_db'):
-        ctx.phpbb3_db.close()
+      ctx.phpbb3_db.close()
