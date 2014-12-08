@@ -45,7 +45,7 @@ class PhpBB3(object):
     self._config['db'].update(app.config.get('PHPBB3_DATABASE', {}))
     self._config['api'].update(app.config.get('PHPBB3_API', {}))
 
-    if self._config['general']['driver'] != 'api':
+    if self._config['general']['DRIVER'] != 'api':
       # Setup available SQL functions
       self._prepare_statements()
 
@@ -119,7 +119,7 @@ class PhpBB3(object):
     return output
 
   def __getattr__(self, name):
-    if self._config['general']['driver'] == 'api':
+    if self._config['general']['DRIVER'] == 'api':
       # Use JSONRPC API - using only first parameter, making sure we use keyworded arguments
       return functools.partial(
         lambda func, **kwargs: func(kwargs),
