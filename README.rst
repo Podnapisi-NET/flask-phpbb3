@@ -47,10 +47,13 @@ Settings
     + **URL** - URL of the API export, default is http://127.0.0.1/connector
     + **SECRET** - Secret key to use when invoking API calls
 
+  * **PHPBB3_COOKIE_NAME** - Sets prefix of session cookie names, default is
+                             phpbb3\_
+
 Example
 +++++++
 
-::
+.. code:: python
 
   PHPBB3 = {
     'DRIVER': 'psycopg2',
@@ -70,13 +73,13 @@ Usage of this connector is simple, just create it as any extension
 
 And in your views just call the apropriate API call:
 
-::
+.. code:: python
 
-  @...
+  @app.route('/my/view')
   def view(...):
-    ...
+    # ...
     latest_posts = phpbb3.fetch_latest_posts()
-    ...
+    # ...
 
 **IMPORTANT:** Use only keyword paramaters!
 
@@ -128,3 +131,32 @@ callable function or SQL query.
 Use string named interpolation format (the psycopg one) to specify kwargs of a function.
 Do not forget to use {TABLE_PREFFIX} variable, to add specific table prefix. (First, the
 python variables from config get evaluated, and then psycopg variables).
+
+Sessions integration
+--------------------
+
+This extension also comes with session interface to use phpBB3's own sessions with your
+Flask application. Usage is quite simple:
+
+.. code:: python
+
+  from flask import Flask
+  from flask.ext.phpbb3 import PhpBB3, PhpBB3SessionInterface
+
+  # Create app and add phpBB3 session interface
+  app = Flask(__name__)
+  app.session_interface = PhpBB3SessionInterface()
+
+  # Do not forget to initialize phpBB3 extension
+  phpbb3 = PhpBB3(app)
+
+And you can use session's **is_authenticated** property to test if user is authenticated.
+
+.. code:: python
+
+  from flask import session
+
+  # ...
+
+  if session.is_authenticated:
+    print 'User is authenticated!'

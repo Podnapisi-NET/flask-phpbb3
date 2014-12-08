@@ -52,6 +52,9 @@ class PhpBB3(object):
     # Setup teardown
     app.teardown_appcontext(self.teardown)
 
+    # Add ourselves to the app, so session interface can function
+    app.phpbb3 = self
+
   @property
   def _db(self):
     """Returns database connection."""
@@ -145,3 +148,38 @@ class PhpBB3(object):
     ctx = stack.top
     if hasattr(ctx, 'phphbb3_db'):
       ctx.phpbb3_db.close()
+
+# Session management
+# TODO Split it into package
+from flask.sessions import SecureCookieSessionInterface, SessionMixin
+
+class PhpBB3Session(dict, SessionMixin):
+  @property
+  def is_authenticated(self):
+    return 'user_id' in self and self['user_id'] > 1
+
+class PhpBB3SessionInterface(SecureCookieSessionInterface):
+  def open_session(self, app, request):
+    cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
+
+    user_id = request.cookies.get(cookie_name + 'u', None)
+    session_id = request.args.get('sid', type = str) or request.cookies.get(cookie_name + 'sid', None)
+    autologin_key = request.cookies.get(cookie_name + 'key', None)
+
+    session = PhpBB3Session()
+    user = None
+    if user_id and session_id:
+      # Try to fetch session
+      user = app.phpbb3.get_session(session_id = session_id)
+    if not session and autologin_key:
+      # Try autologin
+      user = app.phpbb3.get_autologin(key = autologin_key)
+
+    if isinstance(user, dict) and user:
+      session.update(user)
+
+    return session
+
+  def save_session(self, app, session, response):
+    """Currently we do not store anything into phpBB3 session."""
+    pass
