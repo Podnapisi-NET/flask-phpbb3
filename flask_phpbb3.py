@@ -58,8 +58,9 @@ class PhpBB3(object):
                         "AND k.user_id = u.user_id"
                         "AND k.key_id = %(key)s",
       get_session   = "SELECT * "
-                      "FROM {TABLE_PREFIX}sessions "
-                      "WHERE session_id = %(session_id)s",
+                      "FROM {TABLE_PREFIX}sessions s, {TABLE_PREFIX}users u "
+                      "WHERE s.session_id = %(session_id)s "
+                        "AND s.session_user_id = u.user_id",
       get_user      = "SELECT * "
                       "FROM {TABLE_PREFIX}users "
                       "WHERE user_id = %(user_id)d"
