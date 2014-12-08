@@ -9,7 +9,10 @@ from flask import _app_ctx_stack as stack
 class PhpBB3(object):
   KNOWN_OPERATIONS = (
     'fetch',
-    'get'
+    'get',
+  )
+  KNOWN_DRIVERS = (
+    'psycopg2',
   )
 
   def __init__(self, app = None):
@@ -19,20 +22,32 @@ class PhpBB3(object):
       self.init_app(app)
 
   def init_app(self, app):
-    # Load config
-    self._config = dict(
-      DRIVER       = 'psycopg2', # TODO Add other drivers and reusability from other extensions
-      HOST         = '127.0.0.1',
-      DATABASE     = 'phpbb3',
-      USER         = 'phpbb3',
-      PASSWORD     = '',
-      TABLE_PREFIX = 'phpbb_',
-      VERSION      = '3.1', # TODO Currenlty only 3.1 is available
-    )
-    self._config.update(app.config.get('PHPBB3', {}))
+    # Setup default configs
+    self._config = {
+      'general': dict (
+        DRIVER       = 'psycopg2', # TODO Add other drivers and reusability from other extensions
+        VERSION      = '3.1', # TODO Currenlty only 3.1 is available
+      ),
+      'db': dict(
+        HOST         = '127.0.0.1',
+        DATABASE     = 'phpbb3',
+        USER         = 'phpbb3',
+        PASSWORD     = '',
+        TABLE_PREFIX = 'phpbb_',
+      ),
+      'api': dict(
+        URL    = 'http://127.0.0.1/connector',
+        SECRET = '',
+      )
+    }
+    # Load configs
+    self._config['general'].update(app.config.get('PHPBB3', {}))
+    self._config['db'].update(app.config.get('PHPBB3_DATABASE', {}))
+    self._config['api'].update(app.config.get('PHPBB3_API', {}))
 
-    # Setup available SQL functions
-    self._prepare_statements()
+    if self._config['general']['driver'] != 'api':
+      # Setup available SQL functions
+      self._prepare_statements()
 
     # Setup teardown
     app.teardown_appcontext(self.teardown)
@@ -44,10 +59,20 @@ class PhpBB3(object):
     if ctx is not None:
       if not hasattr(ctx, 'phpbb3_db'):
         ctx.phpbb3_db = psycopg2.connect(
-          'dbname={DATABASE} host={HOST} user={USER} password={PASSWORD}'.format(**self._config),
+          'dbname={DATABASE} host={HOST} user={USER} password={PASSWORD}'.format(**self._config['db']),
           connection_factory = psycopg2.extras.DictConnection
         )
       return ctx.phpbb3_db
+
+  @property
+  def _connection(self):
+    """Constructs and returns API connection."""
+    ctx = stack.top
+    if ctx is not None:
+      if not hasattr(ctx, 'phpbb3_api'):
+        import jsonrpclib
+        ctx.phpbb3_api = jsonrpclib.Server(self._config['api']['URL'])
+      return ctx.phpbb3_api
 
   def _prepare_statements(self):
     """Initializes prepared SQL statements, depending on version of PHPBB3."""
@@ -80,7 +105,7 @@ class PhpBB3(object):
       # Add skip and limit
       query += ' OFFSET {:d} LIMIT {:d}'.format(skip, limit)
 
-    c.execute(query.format(**self._config), kwargs)
+    c.execute(query.format(**self._config['db']), kwargs)
 
     output = None
     if operation == 'get':
@@ -94,6 +119,14 @@ class PhpBB3(object):
     return output
 
   def __getattr__(self, name):
+    if self._config['general']['driver'] == 'api':
+      # Use JSONRPC API - using only first parameter, making sure we use keyworded arguments
+      return functools.partial(
+        lambda func, **kwargs: func(kwargs),
+        getattr(self._connection, name)
+      )
+
+    # Here is direct DB access
     if name not in self._functions:
       raise AttributeError("Function {} does not exist, use register_function, to add it.".format(name))
     func = self._functions[name]

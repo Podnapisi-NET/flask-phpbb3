@@ -4,10 +4,61 @@ Flask-phpBB3
 Connector for Flask with phpBB3. Do note, this connector does not use any caches
 and is *read-only*.
 
-Supported DB APIs
+Supported drivers
 -----------------
 
-  * psycopg2
+  * Direct access
+
+    + psycopg2 - direct access to PostgreSQL
+
+  * Api access
+
+    + api (not fully implemented, the phpBB3 connector not written yet)
+
+Supported phpBB3 versions
+-------------------------
+
+  * 3.1.x
+
+Configuration
+-------------
+
+To configure this extension, you have to specify PHPBB3 and one of access modes
+configs. All of them are dicts.
+
+Settings
+++++++++++++++++
+
+  * PHPBB3
+
+    + **DRIVER** - Which driver to use (see `Supported drivers`_)
+    + **VERSION** - Which version of phpBB3 (see `Supported phpBB3 versions`_)
+
+  * PHPBB3_DATABASE - These settings are used when using direct access drivers
+
+    + **HOST** - Database host, default is 127.0.0.1
+    + **DATABASE** - Database name, default is phpbb3
+    + **USER** - User for connecting to database, default is phpbb3
+    + **PASSWORD** - Database user's password, default is empty
+    + **TABLE_PREFIX** - Table prefix of phpBB3 tables, default is phpbb\_
+
+  * PHPBB3_API - These settings are used when using API access drivers
+
+    + **URL** - URL of the API export, default is http://127.0.0.1/connector
+    + **SECRET** - Secret key to use when invoking API calls
+
+Example
++++++++
+
+::
+
+  PHPBB3 = {
+    'DRIVER': 'psycopg2',
+  }
+  PHPBB3_DATABASE = {
+    'DATABASE': 'mydb',
+    'USER': 'myuser',
+  }
 
 API
 ---
