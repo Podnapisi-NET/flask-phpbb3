@@ -44,7 +44,7 @@ class PhpBB3(object):
     if ctx is not None:
       if not hasattr(ctx, 'phpbb3_db'):
         ctx.phpbb3_db = psycopg2.connect(
-          'dbname={DATABASE} host={HOST} user={USER} password={PASSWORD}'.format(self._config),
+          'dbname={DATABASE} host={HOST} user={USER} password={PASSWORD}'.format(**self._config),
           connection_factory = psycopg2.extras.DictConnection
         )
       return ctx.phpbb3_db
@@ -79,7 +79,7 @@ class PhpBB3(object):
       # Add skip and limit
       query += ' OFFSET {:d} LIMIT {:d}'.format(skip, limit)
 
-    c.execute(query.format(self._config), kwargs)
+    c.execute(query.format(**self._config), kwargs)
 
     output = None
     if operation == 'get':
