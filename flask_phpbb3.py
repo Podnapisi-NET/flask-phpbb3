@@ -162,26 +162,29 @@ class PhpBB3Session(dict, SessionMixin):
 
 class PhpBB3SessionInterface(SecureCookieSessionInterface):
   def open_session(self, app, request):
+    session = super(PhpBB3SessionInterface, self).open_session(app, request)
+
     cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
 
     user_id = request.cookies.get(cookie_name + 'u', None)
     session_id = request.args.get('sid', type = str) or request.cookies.get(cookie_name + 'sid', None)
     autologin_key = request.cookies.get(cookie_name + 'key', None)
 
-    session = PhpBB3Session()
-    user = None
-    if user_id and session_id:
-      # Try to fetch session
-      user = app.phpbb3.get_session(session_id = session_id)
-    if not session and autologin_key:
-      # Try autologin
-      user = app.phpbb3.get_autologin(key = autologin_key)
+    if session and session['session_id'] != session_id:
+      # Invalidate our session
+      session = None
 
-    if isinstance(user, dict) and user:
-      session.update(user)
+    if not session:
+      session = PhpBB3Session()
+      user = None
+      if user_id and session_id:
+        # Try to fetch session
+        user = app.phpbb3.get_session(session_id = session_id)
+      if not session and autologin_key:
+        # Try autologin
+        user = app.phpbb3.get_autologin(key = autologin_key)
+
+      if isinstance(user, dict) and user:
+        session.update(user)
 
     return session
-
-  def save_session(self, app, session, response):
-    """Currently we do not store anything into phpBB3 session."""
-    pass
