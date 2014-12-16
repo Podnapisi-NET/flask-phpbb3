@@ -190,5 +190,9 @@ class PhpBB3SessionInterface(SecureCookieSessionInterface):
 
       if isinstance(user, dict) and user:
         session.update(user)
+      else:
+        session['user_id'] = 1
+        if session_id:
+          session['session_id'] = session_id
 
     return session
