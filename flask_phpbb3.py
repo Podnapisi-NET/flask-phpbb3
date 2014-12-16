@@ -112,7 +112,9 @@ class PhpBB3(object):
 
     output = None
     if operation == 'get':
-      output = dict(c.fetchone())
+      output = c.fetchone()
+      if output is not None:
+        output = dict(output)
     elif operation == 'fetch':
       # FIXME a more performant option
       output = [dict(i) for i in c.fetchall()]
