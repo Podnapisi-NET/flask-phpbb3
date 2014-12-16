@@ -161,6 +161,8 @@ class PhpBB3Session(dict, SessionMixin):
     return 'user_id' in self and self['user_id'] > 1
 
 class PhpBB3SessionInterface(SecureCookieSessionInterface):
+  session_class = PhpBB3Session
+
   def open_session(self, app, request):
     session = super(PhpBB3SessionInterface, self).open_session(app, request)
 
