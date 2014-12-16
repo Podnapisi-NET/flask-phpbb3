@@ -171,8 +171,10 @@ class PhpBB3SessionInterface(SecureCookieSessionInterface):
     user_id = request.cookies.get(cookie_name + 'u', None)
     session_id = request.args.get('sid', type = str) or request.cookies.get(cookie_name + 'sid', None)
     autologin_key = request.cookies.get(cookie_name + 'key', None)
+    if not session_id:
+      session_id == None
 
-    if session and session['session_id'] != session_id:
+    if session and session.get('session_id') != session_id:
       # Invalidate our session
       session = None
 
