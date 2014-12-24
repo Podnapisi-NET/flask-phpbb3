@@ -91,7 +91,7 @@ class PhpBB3(object):
                         "AND s.session_user_id = u.user_id",
       get_user      = "SELECT * "
                       "FROM {TABLE_PREFIX}users "
-                      "WHERE user_id = %(user_id)d"
+                      "WHERE user_id = %(user_id)s"
     ))
 
     # TODO Add/Move to version specific queries
