@@ -55,6 +55,44 @@ class PhpBB3(object):
     # Add ourselves to the app, so session interface can function
     app.phpbb3 = self
 
+    # Add function to the request chain
+    # TODO Find a nicer place?
+    @app.before_request
+    def before_request():
+      from flask import session, request
+
+      cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
+
+      user_id = request.cookies.get(cookie_name + 'u', None)
+      session_id = request.args.get('sid', type = str) or request.cookies.get(cookie_name + 'sid', None)
+      autologin_key = request.cookies.get(cookie_name + 'key', None)
+      if not session_id:
+        session_id == None
+
+      if 'session_id' in session and session.get('session_id') != session_id:
+        # Invalidate our session
+        session.clear()
+
+      if 'session_id' not in session:
+        user = None
+        if user_id and session_id:
+          # Try to fetch session
+          user = app.phpbb3.get_session(session_id = session_id)
+        if 'session_id' not in session and autologin_key:
+          # Try autologin
+          user = app.phpbb3.get_autologin(key = autologin_key)
+
+        if isinstance(user, dict) and user:
+          session.update(user)
+        else:
+          session['user_id'] = 1
+          if session_id:
+            session['session_id'] = session_id
+
+      # A dummy variable for testing
+      # FIXME Quite ugly, find another way
+      session.is_authenticated = session.get('user_id', 1) > 1
+
   @property
   def _db(self):
     """Returns database connection."""
@@ -150,49 +188,3 @@ class PhpBB3(object):
     ctx = stack.top
     if hasattr(ctx, 'phphbb3_db'):
       ctx.phpbb3_db.close()
-
-# Session management
-# TODO Split it into package
-from flask.sessions import SecureCookieSessionInterface, SessionMixin
-
-class PhpBB3Session(dict, SessionMixin):
-  @property
-  def is_authenticated(self):
-    return 'user_id' in self and self['user_id'] > 1
-
-class PhpBB3SessionInterface(SecureCookieSessionInterface):
-  session_class = PhpBB3Session
-
-  def open_session(self, app, request):
-    session = super(PhpBB3SessionInterface, self).open_session(app, request)
-
-    cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
-
-    user_id = request.cookies.get(cookie_name + 'u', None)
-    session_id = request.args.get('sid', type = str) or request.cookies.get(cookie_name + 'sid', None)
-    autologin_key = request.cookies.get(cookie_name + 'key', None)
-    if not session_id:
-      session_id == None
-
-    if session and session.get('session_id') != session_id:
-      # Invalidate our session
-      session = None
-
-    if not session:
-      session = PhpBB3Session()
-      user = None
-      if user_id and session_id:
-        # Try to fetch session
-        user = app.phpbb3.get_session(session_id = session_id)
-      if not session and autologin_key:
-        # Try autologin
-        user = app.phpbb3.get_autologin(key = autologin_key)
-
-      if isinstance(user, dict) and user:
-        session.update(user)
-      else:
-        session['user_id'] = 1
-        if session_id:
-          session['session_id'] = session_id
-
-    return session
