@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
-import psycopg2cffi
-import psycopg2cffi.extras
+import psycopg2
+import psycopg2.extras
 
 import functools
 
@@ -100,9 +100,9 @@ class PhpBB3(object):
     ctx = stack.top
     if ctx is not None:
       if not hasattr(ctx, 'phpbb3_db'):
-        ctx.phpbb3_db = psycopg2cffi.connect(
+        ctx.phpbb3_db = psycopg2.connect(
           'dbname={DATABASE} host={HOST} user={USER} password={PASSWORD}'.format(**self._config['db']),
-          connection_factory = psycopg2cffi.extras.DictConnection
+          connection_factory = psycopg2.extras.DictConnection
         )
       return ctx.phpbb3_db
 
