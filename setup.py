@@ -22,7 +22,7 @@ setup(
   platforms = 'any',
   install_requires = [
     'Flask',
-    'psycopg2'
+    'psycopg2cffi'
   ],
   classifiers = [
     'Environment :: Web Environment',
