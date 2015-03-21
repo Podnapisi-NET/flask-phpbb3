@@ -1,7 +1,12 @@
 from __future__ import absolute_import
 
-import psycopg2
-import psycopg2.extras
+try:
+  import psycopg2
+  import psycopg2.extras
+except ImportError:
+  from psycopg2cffi import compat
+  compat.register()
+  import psycopg2.extras
 
 import functools
 

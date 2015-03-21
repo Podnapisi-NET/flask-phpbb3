@@ -22,8 +22,11 @@ setup(
   platforms = 'any',
   install_requires = [
     'Flask',
-    'psycopg2'
   ],
+  extras = {
+    'with_psycopg2': ['psycopg2'],
+    'with_psycopg2cffi': ['psycopg2cffi'],
+  },
   classifiers = [
     'Environment :: Web Environment',
     'Intended Audience :: Developers',
