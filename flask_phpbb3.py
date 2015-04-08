@@ -90,6 +90,9 @@ class PhpBB3(object):
 
         if isinstance(user, dict) and user:
           session.update(user)
+          if 'username' in session:
+            # Username must be in unicode
+            session['username'] = session['username'].decode('utf-8', 'ignore')
         else:
           session['user_id'] = 1
           if session_id:
