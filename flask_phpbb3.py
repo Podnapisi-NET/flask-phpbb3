@@ -46,8 +46,7 @@ class PhpBB3(object):
         SECRET = '',
       ),
       'session_backend': dict(
-        TYPE    = 'simple',
-        SERVERS = None,
+        TYPE = 'simple',
       ),
     }
     # Load configs
@@ -236,7 +235,10 @@ class PhpBB3SessionInterface(SessionInterface):
         self.cache = SimpleCache()
       elif cache_backend == 'memcached':
         from werkzeug.contrib.cache import MemcachedCache
-        self.cache = MemcachedCache(app.phpbb3._config['session_backend'].get('SERVERS', ['127.0.0.1:11211']))
+        self.cache = MemcachedCache(
+          app.phpbb3._config['session_backend'].get('SERVERS', ['127.0.0.1:11211']),
+          key_prefix = app.phpbb3._config['session_backend'].get('KEY_PREFIX', 'phpbb3')
+        )
     else:
       self.cache = app.phpbb3._cache
 
