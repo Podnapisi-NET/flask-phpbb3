@@ -16,6 +16,7 @@ class PhpBB3(object):
   KNOWN_OPERATIONS = (
     'fetch',
     'get',
+    'has',
   )
   KNOWN_DRIVERS = (
     'psycopg2',
@@ -109,13 +110,13 @@ class PhpBB3(object):
       get_user       = "SELECT * "
                        "FROM {TABLE_PREFIX}users "
                        "WHERE user_id = %(user_id)s",
-      get_membership = "SELECT ug.group_id "
+      has_membership = "SELECT ug.group_id "
                        "FROM {TABLE_PREFIX}user_group ug "
                        "WHERE ug.user_id = %(user_id)s "
                          "AND ug.group_id = %(group_id)s "
                          "AND ug.user_pending = 0 "
                        "LIMIT 1",
-      get_membership_resolve = "SELECT ug.group_id "
+      has_membership_resolve = "SELECT ug.group_id "
                                "FROM {TABLE_PREFIX}user_group ug, {TABLE_PREFIX}groups g "
                                "WHERE ug.user_id = %(user_id)s "
                                  "AND g.group_name = %(group_name)s "
@@ -145,6 +146,8 @@ class PhpBB3(object):
       output = c.fetchone()
       if output is not None:
         output = dict(output)
+    elif operation == 'has':
+      output = bool(c.fetchone())
     elif operation == 'fetch':
       # FIXME a more performant option
       output = [dict(i) for i in c.fetchall()]
@@ -210,17 +213,17 @@ class PhpBB3Session(dict, SessionMixin):
         return True
 
       # Access database
-      return bool(current_app.phpbb3.get_membership(user_id  = self['user_id'],
-                                                    group_id = group))
+      return current_app.phpbb3.has_membership(user_id  = self['user_id'],
+                                               group_id = group)
     else:
       # Use group name
-      return bool(current_app.phpbb3.get_membership_resolve(user_id    = self['user_id'],
-                                                            group_name = group))
+      return current_app.phpbb3.has_membership_resolve(user_id    = self['user_id'],
+                                                       group_name = group)
 
   def has_privileges(self, *privileges):
     """Tests if user has any of specified privileges."""
-    # TODO Need API
-    pass
+    from flask import current_app
+    return current_app.phpbb3.has_privileges(self['user_id'], *privileges)
 
 class PhpBB3SessionInterface(SessionInterface):
   """A read-only session interface to access phpBB3 session."""
