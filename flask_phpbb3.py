@@ -62,6 +62,8 @@ class PhpBB3(object):
     if self._config['general']['DRIVER'] != 'api':
       # Setup available SQL functions
       self._prepare_statements()
+    else:
+      self._prepare_calls()
 
     # Setup teardown
     app.teardown_appcontext(self.teardown)
@@ -87,13 +89,48 @@ class PhpBB3(object):
 
   @property
   def _connection(self):
-    """Constructs and returns API connection."""
+    """Returns database connection."""
     ctx = stack.top
     if ctx is not None:
-      if not hasattr(ctx, 'phpbb3_api'):
-        import jsonrpclib
-        ctx.phpbb3_api = jsonrpclib.Server(self._config['api']['URL'])
-      return ctx.phpbb3_api
+      if not hasattr(ctx, 'phpbb3_conn'):
+        from httplib import HTTPConnection
+        ctx.phpbb3_conn = HTTPConnection(self._config['api']['HOST'])
+        ctx.phpbb3_conn.connect()
+      return ctx.phpbb3_conn
+
+  def _api_call(self, method, url, **data):
+    import urllib
+    import json
+
+    args = {
+      'auth_key': self._config['api']['SECRET']
+    }
+    if method == 'GET':
+      args.update(data)
+      data = None
+    else:
+      if not data:
+        data = None
+      else:
+        data = urllib.urlencode(data)
+
+    self._connection.request(method, self._config['api']['URL'] + url + '?' +  urllib.urlencode(args), data)
+    r = self._connection.getresponse()
+    output = None
+    if r.status == 200:
+      try:
+        output = json.load(r)
+        if 'data' in output:
+          output = output['data']
+        else:
+          output = output['status'] == 'ok'
+      except ValueError:
+        pass
+    # Read till end
+    r.read()
+
+    # Return
+    return output
 
   def _prepare_statements(self):
     """Initializes prepared SQL statements, depending on version of PHPBB3."""
@@ -127,6 +164,16 @@ class PhpBB3(object):
 
     # TODO Add/Move to version specific queries
 
+  def _prepare_calls(self):
+    """Initializes calls for phpbb3 connecting API."""
+    self._functions.update(dict(
+      get_session    = lambda self, session_id:        self._api_call('GET', '/session/' + session_id),
+      get_user       = lambda self, user_id:           self._api_call('GET', '/user/' + str(user_id)),
+      has_membership = lambda self, user_id, group_id: self._api_call('GET', '/user/' + str(user_id) + '/member/' + str(group_id)),
+      has_membership_resolve = lambda self, user_id, group_name: self._api_call('GET', '/user/' + str(user_id) + '/member/' + str(group_name)),
+      has_privileges = lambda self, user_id, *privileges: self._api_call('GET', '/user/' + str(user_id) + '/acl', options = ','.join(privileges))
+    ))
+
   def _sql_query(self, operation, query, skip = 0, limit = 10, **kwargs):
     """Executes a query with values in kwargs."""
     if operation not in self.KNOWN_OPERATIONS:
@@ -157,19 +204,11 @@ class PhpBB3(object):
     return output
 
   def __getattr__(self, name):
-    if self._config['general']['DRIVER'] == 'api':
-      # Use JSONRPC API - using only first parameter, making sure we use keyworded arguments
-      return functools.partial(
-        lambda func, **kwargs: func(kwargs),
-        getattr(self._connection, name)
-      )
-
-    # Here is direct DB access
     if name not in self._functions:
       raise AttributeError("Function {} does not exist, use register_function, to add it.".format(name))
     func = self._functions[name]
     if callable(func):
-      return func
+      return functools.partial(func, self)
     else:
       return functools.partial(self._sql_query, name.split('_')[0], func)
 
@@ -183,6 +222,8 @@ class PhpBB3(object):
     ctx = stack.top
     if hasattr(ctx, 'phphbb3_db'):
       ctx.phpbb3_db.close()
+    if hasattr(ctx, 'phphbb3_conn'):
+      ctx.phpbb3_conn.close()
 
 from flask.sessions import SessionMixin, SessionInterface
 
