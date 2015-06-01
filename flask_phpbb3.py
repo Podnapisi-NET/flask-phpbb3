@@ -117,7 +117,7 @@ class PhpBB3(object):
                          "AND ug.user_pending = 0 "
                        "LIMIT 1",
       get_membership_resolve = "SELECT ug.group_id "
-                               "FROM {TABLE_PREFIX}user_group ug, {TABLE_PREFIX}groups g"
+                               "FROM {TABLE_PREFIX}user_group ug, {TABLE_PREFIX}groups g "
                                "WHERE ug.user_id = %(user_id)s "
                                  "AND g.group_name = %(group_name)s "
                                  "AND ug.group_id = g.group_id "
