@@ -207,16 +207,16 @@ class PhpBB3Session(dict, SessionMixin):
 
     if isinstance(group, int):
       # Try with default group
-      if group == self.group_id:
+      if group == self['group_id']:
         return True
 
       # Access database
-      return bool(current_app.phpbb3.get_membership(user_id  = self.user_id,
+      return bool(current_app.phpbb3.get_membership(user_id  = self['user_id'],
                                                     group_id = group))
     else:
       # Use group name
-      return bool(self.get_membership_resolve(user_id    = self.user_id,
-                                              group_name = group))
+      return bool(current_app.phpbb3.get_membership_resolve(user_id    = self['user_id'],
+                                                            group_name = group))
 
   def has_privileges(self, *privileges):
     """Tests if user has any of specified privileges."""
