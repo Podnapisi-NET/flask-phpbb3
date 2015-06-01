@@ -21,13 +21,13 @@ class PhpBB3(object):
     'psycopg2',
   )
 
-  def __init__(self, app = None):
+  def __init__(self, app = None, cache = None):
     self._functions = {}
     self.app = app
     if app is not None:
-      self.init_app(app)
+      self.init_app(app, cache)
 
-  def init_app(self, app):
+  def init_app(self, app, cache = None):
     # Setup default configs
     self._config = {
       'general': dict (
@@ -44,12 +44,20 @@ class PhpBB3(object):
       'api': dict(
         URL    = 'http://127.0.0.1/connector',
         SECRET = '',
-      )
+      ),
+      'session_backend': dict(
+        TYPE    = 'simple',
+        SERVERS = None,
+      ),
     }
     # Load configs
     self._config['general'].update(app.config.get('PHPBB3', {}))
     self._config['db'].update(app.config.get('PHPBB3_DATABASE', {}))
     self._config['api'].update(app.config.get('PHPBB3_API', {}))
+    self._config['session_backend'].update(app.config.get('PHPBB3_SESSION_BACKEND', {}))
+
+    # Use passed in cache interface (see Flask-Cache extension)
+    self._cache = cache
 
     if self._config['general']['DRIVER'] != 'api':
       # Setup available SQL functions
@@ -61,46 +69,9 @@ class PhpBB3(object):
     # Add ourselves to the app, so session interface can function
     app.phpbb3 = self
 
-    # Add function to the request chain
-    # TODO Find a nicer place?
-    @app.before_request
-    def before_request():
-      from flask import session, request
-
-      cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
-
-      user_id = request.cookies.get(cookie_name + 'u', None)
-      session_id = request.args.get('sid', type = str) or request.cookies.get(cookie_name + 'sid', None)
-      autologin_key = request.cookies.get(cookie_name + 'key', None)
-      if not session_id:
-        session_id == None
-
-      if 'session_id' in session and session.get('session_id') != session_id:
-        # Invalidate our session
-        session.clear()
-
-      if 'session_id' not in session:
-        user = None
-        if user_id and session_id:
-          # Try to fetch session
-          user = app.phpbb3.get_session(session_id = session_id)
-        if 'session_id' not in session and autologin_key:
-          # Try autologin
-          user = app.phpbb3.get_autologin(key = autologin_key)
-
-        if isinstance(user, dict) and user:
-          session.update(user)
-          if 'username' in session:
-            # Username must be in unicode
-            session['username'] = session['username'].decode('utf-8', 'ignore')
-        else:
-          session['user_id'] = 1
-          if session_id:
-            session['session_id'] = session_id
-
-      # A dummy variable for testing
-      # FIXME Quite ugly, find another way
-      session.is_authenticated = session.get('user_id', 1) > 1
+    # Use our session interface
+    # TODO Is it wise to do it here? Should user do it himself?
+    app.session_interface = PhpBB3SessionInterface(app)
 
   @property
   def _db(self):
@@ -127,18 +98,31 @@ class PhpBB3(object):
   def _prepare_statements(self):
     """Initializes prepared SQL statements, depending on version of PHPBB3."""
     self._functions.update(dict(
-      get_autologin = "SELECT u.* "
-                      "FROM {TABLE_PREFIX}users u, {TABLE_PREFIX}sessions_keys k "
-                      "WHERE u.user_type IN (0, 3)" # FIXME Make it prettier, USER_NORMAL and USER_FOUNDER
-                        "AND k.user_id = u.user_id"
-                        "AND k.key_id = %(key)s",
-      get_session   = "SELECT * "
-                      "FROM {TABLE_PREFIX}sessions s, {TABLE_PREFIX}users u "
-                      "WHERE s.session_id = %(session_id)s "
-                        "AND s.session_user_id = u.user_id",
-      get_user      = "SELECT * "
-                      "FROM {TABLE_PREFIX}users "
-                      "WHERE user_id = %(user_id)s"
+      get_autologin  = "SELECT u.* "
+                       "FROM {TABLE_PREFIX}users u, {TABLE_PREFIX}sessions_keys k "
+                       "WHERE u.user_type IN (0, 3)" # FIXME Make it prettier, USER_NORMAL and USER_FOUNDER
+                         "AND k.user_id = u.user_id"
+                         "AND k.key_id = %(key)s",
+      get_session    = "SELECT * "
+                       "FROM {TABLE_PREFIX}sessions s, {TABLE_PREFIX}users u "
+                       "WHERE s.session_id = %(session_id)s "
+                         "AND s.session_user_id = u.user_id",
+      get_user       = "SELECT * "
+                       "FROM {TABLE_PREFIX}users "
+                       "WHERE user_id = %(user_id)s",
+      get_membership = "SELECT ug.group_id "
+                       "FROM {TABLE_PREFIX}user_group ug "
+                       "WHERE ug.user_id = %(user_id)s "
+                         "AND ug.group_id = %(group_id)s "
+                         "AND ug.user_pending = 0 "
+                       "LIMIT 1",
+      get_membership_resolve = "SELECT ug.group_id "
+                               "FROM {TABLE_PREFIX}user_group ug, {TABLE_PREFIX}groups g"
+                               "WHERE ug.user_id = %(user_id)s "
+                                 "AND g.group_name = %(group_name)s "
+                                 "AND ug.group_id = g.group_id "
+                                 "AND ug.user_pending = 0 "
+                               "LIMIT 1",
     ))
 
     # TODO Add/Move to version specific queries
@@ -197,3 +181,108 @@ class PhpBB3(object):
     ctx = stack.top
     if hasattr(ctx, 'phphbb3_db'):
       ctx.phpbb3_db.close()
+
+from flask.sessions import SessionMixin, SessionInterface
+
+class PhpBB3Session(dict, SessionMixin):
+  def __init__(self):
+    # Some session related variables
+    self.modified = False
+    self.new = False
+    self._read_only_properties = set([])
+
+  def __setitem__(self, key, value):
+    super(PhpBB3Session, self).__setitem__(key, value)
+    if key not in self._read_only_properties:
+      self.modified = True
+
+  @property
+  def is_authenticated(self):
+    """Helper method to test if user is authenticated."""
+    return self.get('user_id', 1) > 1
+
+  def is_member(self, group):
+    """Tests if user is a member of specified group."""
+    from flask import current_app
+
+    if isinstance(group, int):
+      # Try with default group
+      if group == self.group_id:
+        return True
+
+      # Access database
+      return bool(current_app.phpbb3.get_membership(user_id  = self.user_id,
+                                                    group_id = group))
+    else:
+      # Use group name
+      return bool(self.get_membership_resolve(user_id    = self.user_id,
+                                              group_name = group))
+
+  def has_privileges(self, *privileges):
+    """Tests if user has any of specified privileges."""
+    # TODO Need API
+    pass
+
+class PhpBB3SessionInterface(SessionInterface):
+  """A read-only session interface to access phpBB3 session."""
+  session_class = PhpBB3Session
+
+  def __init__(self, app):
+    """Initializes session interface with app and possible cache (Flask-Cache) object for storing additional data."""
+    if app.phpbb3._cache is None:
+      cache_backend = app.phpbb3._config['session_backend'].get('TYPE', 'simple')
+      if cache_backend == 'simple':
+        from werkzeug.contrib.cache import SimpleCache
+        self.cache = SimpleCache()
+      elif cache_backend == 'memcached':
+        from werkzeug.contrib.cache import MemcachedCache
+        self.cache = MemcachedCache(app.phpbb3._config['session_backend'].get('SERVERS', ['127.0.0.1:11211']))
+    else:
+      self.cache = app.phpbb3._cache
+
+  def open_session(self, app, request):
+    cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
+
+    session_id = request.args.get('sid', type = str) or request.cookies.get(cookie_name + 'sid', None)
+    if not session_id:
+      session_id = None
+
+    user = None
+    if session_id:
+      # Try to fetch session
+      user = app.phpbb3.get_session(session_id = session_id)
+      if 'username' in user:
+        user['username'] = user['username'].decode('utf-8', 'ignore')
+    else:
+      # Use anonymous user
+      user = app.phpbb3.get_user(user_id = 1)
+
+    # Create session
+    session = self.session_class()
+
+    # Set session data
+    if isinstance(user, dict) and user:
+      session._read_only_properties = set(user.keys())
+      session.update(user)
+
+      import json
+
+      # Read from local storage backend
+      data = self.cache.get('sessions_' + session['session_id'])
+      try:
+        data = json.loads(data or '')
+      except ValueError:
+        data = None
+      if not isinstance(data, dict):
+        data = {}
+      session.update(data)
+
+    return session
+
+  def save_session(self, app, session, response):
+    """Currenlty does nothing."""
+    if session.modified and session._read_only_properties:
+      import json
+      # Store all 'storable' properties
+      data = dict([(k, v) for k, v in session.items() if k not in session._read_only_properties])
+      self.cache.set('sessions_' + session['session_id'], json.dumps(data))
