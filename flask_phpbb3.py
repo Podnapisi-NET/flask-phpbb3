@@ -53,6 +53,18 @@ class PhpBB3(object):
 
     # Use passed in cache interface (see Flask-Cache extension)
     self._cache = cache
+    if self._cache is None:
+      # Setup our own
+      cache_backend = self._config['session_backend'].get('TYPE', 'simple')
+      if cache_backend == 'simple':
+        from werkzeug.contrib.cache import SimpleCache
+        self._cache = SimpleCache()
+      elif cache_backend == 'memcached':
+        from werkzeug.contrib.cache import MemcachedCache
+        self._cache = MemcachedCache(
+          self._config['session_backend'].get('SERVERS', ['127.0.0.1:11211']),
+          key_prefix = self._config['session_backend'].get('KEY_PREFIX', 'phpbb3')
+        )
 
     # Setup available SQL functions
     self._prepare_statements()
@@ -190,25 +202,108 @@ class PhpBB3Session(dict, SessionMixin):
       return current_app.phpbb3.has_membership_resolve(user_id    = self['user_id'],
                                                        group_name = group)
 
+  def _load_acl(self):
+    if self._acl is not None and self._acl_options:
+      # Nothing to load/convert
+      return
+
+    acl_key = '{}_acl'.format(self['user_id'])
+
+    from flask import current_app
+
+    # Fetch from cache
+    self._acl_options = current_app.phpbb3._cache.get('acl_options')
+    self._acl = current_app.phpbb3._cache.get(acl_key)
+
+    if not self._acl_options:
+      # Load ACL options, so we can decode the user ACL
+      self._acl_options = {
+        'local': {},
+        'global': {}
+      }
+      local_index = 0
+      global_index = 0
+
+      for opt in current_app.phpbb3.fetch_acl_options(limit = None):
+        if opt['is_local'] == 1:
+          self._acl_options['local'][opt['auth_option']] = local_index
+          local_index += 1
+        if opt['is_global'] == 1:
+          self._acl_options['global'][opt['auth_option']] = global_index
+          global_index += 1
+        # TODO By looking phpbb3 code, here also comes translation option <=> id
+
+      # Store it into cache
+      current_app.phpbb3._cache.set('acl_options', self._acl_options)
+
+    if not self._acl:
+      # Load/transform user's ACL data
+      seq_cache = {}
+      self._acl = {}
+
+      for f, perms in enumerate(self['user_permissions'].rstrip().splitlines()):
+        if not perms:
+          continue
+
+        # Do the conversion magic
+        self._acl[str(f)] = ''
+        for sub in [perms[j:j + 6] for j in range(0, len(perms), 6)]:
+          if sub in seq_cache:
+            converted = seq_cache[sub]
+          else:
+            converted = bin(int(sub, 36))[2:]
+            converted = seq_cache[sub] = '0' * (31 - len(converted)) + converted
+
+          self._acl[str(f)] += converted
+
+      current_app.phpbb3._cache.set(acl_key, self._acl)
+
+  def has_privilege(self, option, forum_id = 0):
+    """Test if user has global or local (if forum_id is set) privileges."""
+    # We load the ACL
+    self._load_acl()
+
+    # Make sure it is int, and convert it into str for mapping purposes
+    forum_id = str(int(forum_id))
+
+    # Parse negation
+    negated = option.startswith('!')
+    if negated:
+      option = option[1:]
+
+    if forum_id not in self._acl_cache or option not in self._acl_cache[forum_id]:
+      # Default is, no permission
+      self._acl_cache.setdefault(forum_id, {})[option] = False
+
+      # Global permissions...
+      if option in self._acl_options['global'] and '0' in self._acl:
+        try:
+          self._acl_cache[forum_id][option] = bool(int(self._acl['0'][self._acl_options['global'][option]]))
+        except IndexError:
+          pass
+
+      # Local permissions...
+      if forum_id != '0' and option in self._acl_options['local']:
+        try:
+          self._acl_cache[forum_id][option] |= bool(int(self._acl.get(forum_id, '0' * 31)[self._acl_options['local'][option]]))
+        except IndexError:
+          pass
+
+    return negated ^ self._acl_cache[forum_id][option]
+
+  def has_privileges(self, *options, **kwargs):
+    output = False
+    for option in options:
+      output |= self.has_privilege(option, **kwargs)
+    return output
+
 class PhpBB3SessionInterface(SessionInterface):
   """A read-only session interface to access phpBB3 session."""
   session_class = PhpBB3Session
 
   def __init__(self, app):
     """Initializes session interface with app and possible cache (Flask-Cache) object for storing additional data."""
-    if app.phpbb3._cache is None:
-      cache_backend = app.phpbb3._config['session_backend'].get('TYPE', 'simple')
-      if cache_backend == 'simple':
-        from werkzeug.contrib.cache import SimpleCache
-        self.cache = SimpleCache()
-      elif cache_backend == 'memcached':
-        from werkzeug.contrib.cache import MemcachedCache
-        self.cache = MemcachedCache(
-          app.phpbb3._config['session_backend'].get('SERVERS', ['127.0.0.1:11211']),
-          key_prefix = app.phpbb3._config['session_backend'].get('KEY_PREFIX', 'phpbb3')
-        )
-    else:
-      self.cache = app.phpbb3._cache
+    self.cache = app.phpbb3._cache
 
   def open_session(self, app, request):
     cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
