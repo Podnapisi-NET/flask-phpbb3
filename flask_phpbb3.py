@@ -42,10 +42,6 @@ class PhpBB3(object):
         PASSWORD     = '',
         TABLE_PREFIX = 'phpbb_',
       ),
-      'api': dict(
-        URL    = 'http://127.0.0.1/connector',
-        SECRET = '',
-      ),
       'session_backend': dict(
         TYPE = 'simple',
       ),
@@ -53,17 +49,13 @@ class PhpBB3(object):
     # Load configs
     self._config['general'].update(app.config.get('PHPBB3', {}))
     self._config['db'].update(app.config.get('PHPBB3_DATABASE', {}))
-    self._config['api'].update(app.config.get('PHPBB3_API', {}))
     self._config['session_backend'].update(app.config.get('PHPBB3_SESSION_BACKEND', {}))
 
     # Use passed in cache interface (see Flask-Cache extension)
     self._cache = cache
 
-    if self._config['general']['DRIVER'] != 'api':
-      # Setup available SQL functions
-      self._prepare_statements()
-    else:
-      self._prepare_calls()
+    # Setup available SQL functions
+    self._prepare_statements()
 
     # Setup teardown
     app.teardown_appcontext(self.teardown)
@@ -86,51 +78,6 @@ class PhpBB3(object):
           connection_factory = psycopg2.extras.DictConnection
         )
       return ctx.phpbb3_db
-
-  @property
-  def _connection(self):
-    """Returns database connection."""
-    ctx = stack.top
-    if ctx is not None:
-      if not hasattr(ctx, 'phpbb3_conn'):
-        from httplib import HTTPConnection
-        ctx.phpbb3_conn = HTTPConnection(self._config['api']['HOST'])
-        ctx.phpbb3_conn.connect()
-      return ctx.phpbb3_conn
-
-  def _api_call(self, method, url, **data):
-    import urllib
-    import json
-
-    args = {
-      'auth_key': self._config['api']['SECRET']
-    }
-    if method == 'GET':
-      args.update(data)
-      data = None
-    else:
-      if not data:
-        data = None
-      else:
-        data = urllib.urlencode(data)
-
-    self._connection.request(method, self._config['api']['URL'] + url + '?' +  urllib.urlencode(args), data)
-    r = self._connection.getresponse()
-    output = None
-    if r.status == 200:
-      try:
-        output = json.load(r)
-        if 'data' in output:
-          output = output['data']
-        else:
-          output = output['status'] == 'ok'
-      except ValueError:
-        pass
-    # Read till end
-    r.read()
-
-    # Return
-    return output
 
   def _prepare_statements(self):
     """Initializes prepared SQL statements, depending on version of PHPBB3."""
@@ -163,16 +110,6 @@ class PhpBB3(object):
     ))
 
     # TODO Add/Move to version specific queries
-
-  def _prepare_calls(self):
-    """Initializes calls for phpbb3 connecting API."""
-    self._functions.update(dict(
-      get_session    = lambda self, session_id:        self._api_call('GET', '/session/' + session_id),
-      get_user       = lambda self, user_id:           self._api_call('GET', '/user/' + str(user_id)),
-      has_membership = lambda self, user_id, group_id: self._api_call('GET', '/user/' + str(user_id) + '/member/' + str(group_id)),
-      has_membership_resolve = lambda self, user_id, group_name: self._api_call('GET', '/user/' + str(user_id) + '/member/' + str(group_name)),
-      has_privileges = lambda self, user_id, *privileges: self._api_call('GET', '/user/' + str(user_id) + '/acl', options = ','.join(privileges))
-    ))
 
   def _sql_query(self, operation, query, skip = 0, limit = 10, **kwargs):
     """Executes a query with values in kwargs."""
@@ -212,18 +149,10 @@ class PhpBB3(object):
     else:
       return functools.partial(self._sql_query, name.split('_')[0], func)
 
-  def register_function(self, name, callable_or_sql):
-    """Adds/Overwrites a function with 'name' with 'callable_or_sql'."""
-    if not isinstance(callable_or_sql, basestring) or not callable(callable_or_sql):
-      raise TypeError("To register a function, you have to specify a SQL query as string, or a callable object.")
-    self._functions[name] = callable_or_sql
-
   def teardown(self, exception):
     ctx = stack.top
     if hasattr(ctx, 'phphbb3_db'):
       ctx.phpbb3_db.close()
-    if hasattr(ctx, 'phphbb3_conn'):
-      ctx.phpbb3_conn.close()
 
 from flask.sessions import SessionMixin, SessionInterface
 
