@@ -133,23 +133,25 @@ class PhpBB3(object):
 
     if operation == 'fetch':
       # Add skip and limit
-      query += ' OFFSET {:d} LIMIT {:d}'.format(skip, limit)
+      query += ' OFFSET {:d}'.format(skip)
+      if limit:
+        query += 'LIMIT {:d}'.format(limit)
 
     c.execute(query.format(**self._config['db']), kwargs)
 
     output = None
     if operation == 'get':
       output = c.fetchone()
+      c.close()
       if output is not None:
         output = dict(output)
     elif operation == 'has':
       output = bool(c.fetchone())
+      c.close()
     elif operation == 'fetch':
       # FIXME a more performant option
-      output = [dict(i) for i in c.fetchall()]
+      output = (dict(i) for i in c)
 
-    # Finish it
-    c.close()
     return output
 
   def __getattr__(self, name):
