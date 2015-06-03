@@ -319,9 +319,9 @@ class PhpBB3SessionInterface(SessionInterface):
     if session_id:
       # Try to fetch session
       user = app.phpbb3.get_session(session_id = session_id)
-      if 'username' in user:
+      if user and 'username' in user:
         user['username'] = user['username'].decode('utf-8', 'ignore')
-    else:
+    if not user:
       # Use anonymous user
       user = app.phpbb3.get_user(user_id = 1)
 
@@ -336,12 +336,15 @@ class PhpBB3SessionInterface(SessionInterface):
       import json
 
       # Read from local storage backend
-      data = self.cache.get('sessions_' + session['session_id'])
-      try:
-        data = json.loads(data or '')
-      except ValueError:
-        data = None
-      if not isinstance(data, dict):
+      if 'session_id' in session:
+        data = self.cache.get('sessions_' + session['session_id'])
+        try:
+          data = json.loads(data or '')
+        except ValueError:
+          data = None
+        if not isinstance(data, dict):
+          data = {}
+      else:
         data = {}
       session.update(data)
 
@@ -353,4 +356,6 @@ class PhpBB3SessionInterface(SessionInterface):
       import json
       # Store all 'storable' properties
       data = dict([(k, v) for k, v in session.items() if k not in session._read_only_properties])
-      self.cache.set('sessions_' + session['session_id'], json.dumps(data))
+
+      if 'session_id' in session:
+        self.cache.set('sessions_' + session['session_id'], json.dumps(data))
