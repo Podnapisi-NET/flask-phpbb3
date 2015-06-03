@@ -119,6 +119,7 @@ class PhpBB3(object):
                                  "AND ug.group_id = g.group_id "
                                  "AND ug.user_pending = 0 "
                                "LIMIT 1",
+      fetch_acl_options = "SELECT * FROM {TABLE_PREFIX}acl_options ORDER BY auth_option_id"
     ))
 
     # TODO Add/Move to version specific queries
@@ -177,6 +178,11 @@ class PhpBB3Session(dict, SessionMixin):
     self.new = False
     self._read_only_properties = set([])
 
+    # Some ACL related things
+    self._acl_options = None
+    self._acl = None
+    self._acl_cache = {}
+
   def __setitem__(self, key, value):
     super(PhpBB3Session, self).__setitem__(key, value)
     if key not in self._read_only_properties:
@@ -209,13 +215,10 @@ class PhpBB3Session(dict, SessionMixin):
       # Nothing to load/convert
       return
 
-    acl_key = '{}_acl'.format(self['user_id'])
-
     from flask import current_app
 
     # Fetch from cache
-    self._acl_options = current_app.phpbb3._cache.get('acl_options')
-    self._acl = current_app.phpbb3._cache.get(acl_key)
+    self._acl_options = current_app.phpbb3._cache.get('_acl_options')
 
     if not self._acl_options:
       # Load ACL options, so we can decode the user ACL
@@ -236,7 +239,7 @@ class PhpBB3Session(dict, SessionMixin):
         # TODO By looking phpbb3 code, here also comes translation option <=> id
 
       # Store it into cache
-      current_app.phpbb3._cache.set('acl_options', self._acl_options)
+      current_app.phpbb3._cache.set('_acl_options', self._acl_options)
 
     if not self._acl:
       # Load/transform user's ACL data
@@ -257,8 +260,6 @@ class PhpBB3Session(dict, SessionMixin):
             converted = seq_cache[sub] = '0' * (31 - len(converted)) + converted
 
           self._acl[str(f)] += converted
-
-      current_app.phpbb3._cache.set(acl_key, self._acl)
 
   def has_privilege(self, option, forum_id = 0):
     """Test if user has global or local (if forum_id is set) privileges."""
