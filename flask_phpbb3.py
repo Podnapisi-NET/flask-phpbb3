@@ -142,7 +142,7 @@ class PhpBB3(object):
 
   def __getattr__(self, name):
     if name not in self._functions:
-      raise AttributeError("Function {} does not exist, use register_function, to add it.".format(name))
+      raise AttributeError("Function {} does not exist.".format(name))
     func = self._functions[name]
     if callable(func):
       return functools.partial(func, self)
@@ -189,11 +189,6 @@ class PhpBB3Session(dict, SessionMixin):
       # Use group name
       return current_app.phpbb3.has_membership_resolve(user_id    = self['user_id'],
                                                        group_name = group)
-
-  def has_privileges(self, *privileges):
-    """Tests if user has any of specified privileges."""
-    from flask import current_app
-    return current_app.phpbb3.has_privileges(self['user_id'], *privileges)
 
 class PhpBB3SessionInterface(SessionInterface):
   """A read-only session interface to access phpBB3 session."""
