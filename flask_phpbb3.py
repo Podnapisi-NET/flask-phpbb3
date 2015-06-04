@@ -17,6 +17,7 @@ class PhpBB3(object):
     'fetch',
     'get',
     'has',
+    'set',
   )
   KNOWN_DRIVERS = (
     'psycopg2',
@@ -152,6 +153,11 @@ class PhpBB3(object):
     elif operation == 'fetch':
       # FIXME a more performant option
       output = (dict(i) for i in c)
+    elif operation == 'set':
+      # It is an update
+      output = c.statusmessage
+      self._db.commit()
+      c.close()
 
     return output
 
