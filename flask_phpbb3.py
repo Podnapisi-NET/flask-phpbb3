@@ -120,7 +120,7 @@ class PhpBB3(object):
                                  "AND ug.group_id = g.group_id "
                                  "AND ug.user_pending = 0 "
                                "LIMIT 1",
-      fetch_acl_options = "SELECT * FROM {TABLE_PREFIX}acl_options ORDER BY auth_option_id"
+      fetch_acl_options = "SELECT * FROM {TABLE_PREFIX}acl_options ORDER BY auth_option_id",
     ))
 
     # TODO Add/Move to version specific queries
