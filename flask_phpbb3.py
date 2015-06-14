@@ -85,7 +85,8 @@ class PhpBB3(object):
     """Returns database connection."""
     ctx = stack.top
     if ctx is not None:
-      if not hasattr(ctx, 'phpbb3_db'):
+      # Connect when there is no connection or we have a closed connection
+      if not hasattr(ctx, 'phpbb3_db') or ctx.phpbb3_db.closed:
         ctx.phpbb3_db = psycopg2.connect(
           'dbname={DATABASE} host={HOST} user={USER} password={PASSWORD}'.format(**self._config['db']),
           connection_factory = psycopg2.extras.DictConnection

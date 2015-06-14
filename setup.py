@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
   name = 'Flask-phpBB3',
-  version = '0.1.2',
+  version = '0.1.3',
   url = 'https://github.com/MasterMind2k/flask-phpbb3',
   license = 'BSD',
   author = 'Gregor Kalisnik',
