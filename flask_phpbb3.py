@@ -191,9 +191,10 @@ class PhpBB3Session(dict, SessionMixin):
     self._acl_cache = {}
 
   def __setitem__(self, key, value):
+    modified = self.get(key) != value
     super(PhpBB3Session, self).__setitem__(key, value)
     if key not in self._read_only_properties:
-      self.modified = True
+      self.modified = modified
 
   @property
   def is_authenticated(self):
@@ -365,4 +366,5 @@ class PhpBB3SessionInterface(SessionInterface):
       data = dict([(k, v) for k, v in session.items() if k not in session._read_only_properties])
 
       if 'session_id' in session:
-        self.cache.set('sessions_' + session['session_id'], json.dumps(data))
+        # TODO Read session validity from phpbb3 config
+        self.cache.set('sessions_' + session['session_id'], json.dumps(data), timeout = int(3600 * 1.5))
