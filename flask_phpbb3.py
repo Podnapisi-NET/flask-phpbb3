@@ -196,6 +196,11 @@ class PhpBB3Session(dict, SessionMixin):
     if key not in self._read_only_properties:
       self.modified = modified
 
+  def pop(self, *args, **kwargs):
+    """Wrapper to set modified."""
+    self.modified = True
+    return super(PhpBB3Session, self).pop(*args, **kwargs)
+
   @property
   def is_authenticated(self):
     """Helper method to test if user is authenticated."""
