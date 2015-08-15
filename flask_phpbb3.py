@@ -122,6 +122,12 @@ class PhpBB3(object):
                                  "AND ug.user_pending = 0 "
                                "LIMIT 1",
       fetch_acl_options = "SELECT * FROM {TABLE_PREFIX}acl_options ORDER BY auth_option_id",
+      get_unread_notifications_count = "SELECT COUNT(n.*) as num "
+                                       "FROM {TABLE_PREFIX}notifications n, {TABLE_PREFIX}notification_types nt "
+                                       "WHERE n.user_id = %(user_id)s "
+                                         "AND nt.notification_type_id = n.notification_type_id "
+                                         "AND nt.notification_type_enabled = 1 "
+                                         "AND n.notification_read = 0",
     ))
 
     # TODO Add/Move to version specific queries
@@ -189,6 +195,11 @@ class PhpBB3Session(dict, SessionMixin):
     self._acl_options = None
     self._acl = None
     self._acl_cache = {}
+
+    # Per request cache
+    # This should not be cached into session, but per
+    # request should not be executed multiple times
+    self._request_cache = {}
 
   def __setitem__(self, key, value):
     modified = self.get(key) != value
@@ -312,6 +323,22 @@ class PhpBB3Session(dict, SessionMixin):
     for option in options:
       output |= self.has_privilege(option, **kwargs)
     return output
+
+  def get_link_hash(self, link):
+    """Returns link hash."""
+    if not self.is_authenticated:
+      return ''
+
+    import hashlib
+    return hashlib.sha1(self['user_form_salt'] + link).hexdigest()[:8]
+
+  @property
+  def num_unread_notifications(self):
+    """Returns number of unread notifications."""
+    from flask import current_app
+    if 'num_unread_notifications' not in self._request_cache:
+      self._request_cache['num_unread_notifications'] = current_app.phpbb3.get_unread_notifications_count(user_id = self['user_id'])['num']
+    return self._request_cache['num_unread_notifications']
 
 class PhpBB3SessionInterface(SessionInterface):
   """A read-only session interface to access phpBB3 session."""
