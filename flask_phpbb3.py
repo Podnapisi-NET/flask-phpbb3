@@ -12,9 +12,13 @@ except ImportError:
   compat.register()
   import psycopg2.extras
 
+import json
 import functools
 
 from flask import _app_ctx_stack as stack
+
+ANONYMOUS_CACHE_TTL = 3600 * 24
+ACL_OPTIONS_CACHE_TTL = 3600 * 1
 
 class PhpBB3(object):
   KNOWN_OPERATIONS = (
@@ -136,10 +140,25 @@ class PhpBB3(object):
 
     # TODO Add/Move to version specific queries
 
-  def _sql_query(self, operation, query, skip = 0, limit = 10, **kwargs):
+  def _sql_query(self, operation, query, cache_key=None, cache_ttl=None, skip=0, limit=10, **kwargs):
     """Executes a query with values in kwargs."""
     if operation not in self.KNOWN_OPERATIONS:
       raise ValueError("Unknown operation")
+
+    if cache_key and operation != 'set':
+      versioned_cache_key = '{name}:{arguments}'.format(
+        name=cache_key,
+        arguments=':'.join(key + str(value) for key, value in kwargs.items())
+      )
+      raw_data = self._cache.get(versioned_cache_key)
+      if raw_data and isinstance(raw_data, basestring):
+        try:
+          return json.loads(raw_data)
+        except ValueError:
+          # Woops :S
+          pass
+    else:
+      versioned_cache_key = None
 
     # FIXME Driver specific code!
     c = self._db.cursor()
@@ -155,31 +174,54 @@ class PhpBB3(object):
     output = None
     if operation == 'get':
       output = c.fetchone()
-      c.close()
       if output is not None:
         output = dict(output)
     elif operation == 'has':
       output = bool(c.fetchone())
-      c.close()
     elif operation == 'fetch':
       # FIXME a more performant option
-      output = (dict(i) for i in c)
+      output = [dict(i) for i in c]
     elif operation == 'set':
       # It is an update
       output = c.statusmessage
       self._db.commit()
-      c.close()
+    c.close()
+
+    if versioned_cache_key:
+      try:
+        self._cache.set(versioned_cache_key, json.dumps(output), cache_ttl)
+      except ValueError:
+        # Woops :S
+        pass
 
     return output
 
   def __getattr__(self, name):
-    if name not in self._functions:
-      raise AttributeError("Function {} does not exist.".format(name))
-    func = self._functions[name]
-    if callable(func):
-      return functools.partial(func, self)
+    parsed_name = name.split('_')
+    is_cached = False
+    if parsed_name[0] == 'cached':
+      is_cached = True
+      parsed_name = parsed_name[1:]
+
+    operation = parsed_name[0]
+    prepared_statement = '_'.join(parsed_name)
+    cache_key = None
+    if is_cached:
+      cache_key = prepared_statement
+
+    if prepared_statement not in self._functions:
+      raise AttributeError("Function {} does not exist.".format(prepared_statement))
+
+    func_or_query = self._functions[prepared_statement]
+    if callable(func_or_query):
+      return functools.partial(func_or_query, self)
     else:
-      return functools.partial(self._sql_query, name.split('_')[0], func)
+      return functools.partial(
+        self._sql_query,
+        operation,
+        func_or_query,
+        cache_key,
+      )
 
   def teardown(self, exception):
     ctx = stack.top
@@ -257,7 +299,7 @@ class PhpBB3Session(dict, SessionMixin):
       local_index = 0
       global_index = 0
 
-      for opt in current_app.phpbb3.fetch_acl_options(limit = None):
+      for opt in current_app.phpbb3.cached_fetch_acl_options(cache_ttl=ACL_OPTIONS_CACHE_TTL, limit=None):
         if opt['is_local'] == 1:
           self._acl_options['local'][opt['auth_option']] = local_index
           local_index += 1
@@ -367,7 +409,7 @@ class PhpBB3SessionInterface(SessionInterface):
         user['username'] = user['username'].decode('utf-8', 'ignore')
     if not user:
       # Use anonymous user
-      user = app.phpbb3.get_user(user_id = 1)
+      user = app.phpbb3.cached_get_user(user_id=1, cache_ttl=ANONYMOUS_CACHE_TTL)
 
     # Create session
     session = self.session_class()
@@ -376,8 +418,6 @@ class PhpBB3SessionInterface(SessionInterface):
     if isinstance(user, dict) and user:
       session._read_only_properties = set(user.keys())
       session.update(user)
-
-      import json
 
       # Read from local storage backend
       if 'session_id' in session:
@@ -397,7 +437,6 @@ class PhpBB3SessionInterface(SessionInterface):
   def save_session(self, app, session, response):
     """Currenlty does nothing."""
     if session.modified and session._read_only_properties:
-      import json
       # Store all 'storable' properties
       data = dict([(k, v) for k, v in session.items() if k not in session._read_only_properties])
 
