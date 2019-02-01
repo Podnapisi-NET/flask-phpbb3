@@ -1,5 +1,11 @@
 from __future__ import absolute_import
 
+import functools
+import json
+
+import flask.sessions
+from flask import _app_ctx_stack as flask_stack
+
 import pkg_resources
 
 __version__ = pkg_resources.get_distribution(__name__).version
@@ -11,12 +17,6 @@ except ImportError:
     from psycopg2cffi import compat
     compat.register()
     import psycopg2.extras
-
-import json
-import functools
-
-from flask import _app_ctx_stack as stack
-from flask.sessions import SessionMixin, SessionInterface
 
 ANONYMOUS_CACHE_TTL = 3600 * 24
 ACL_OPTIONS_CACHE_TTL = 3600 * 1
@@ -101,7 +101,7 @@ class PhpBB3(object):
     @property
     def _db(self):
         """Returns database connection."""
-        ctx = stack.top
+        ctx = flask_stack.top
         if ctx is not None:
             # Connect when there is no connection or we have a closed
             # connection
@@ -277,12 +277,12 @@ class PhpBB3(object):
             )
 
     def teardown(self, exception):
-        ctx = stack.top
+        ctx = flask_stack.top
         if hasattr(ctx, 'phphbb3_db'):
             ctx.phpbb3_db.close()
 
 
-class PhpBB3Session(dict, SessionMixin):
+class PhpBB3Session(dict, flask.session.SessionMixin):
     def __init__(self):
         # Some session related variables
         self.modified = False
@@ -462,7 +462,7 @@ class PhpBB3Session(dict, SessionMixin):
         return self._request_cache['num_unread_notifications']
 
 
-class PhpBB3SessionInterface(SessionInterface):
+class PhpBB3SessionInterface(flask.session.SessionInterface):
     """A read-only session interface to access phpBB3 session."""
     session_class = PhpBB3Session
 
