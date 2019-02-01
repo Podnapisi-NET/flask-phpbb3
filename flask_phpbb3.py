@@ -17,6 +17,8 @@ import functools
 
 from flask import _app_ctx_stack as stack
 
+ANONYMOUS_CACHE_TTL = 3600 * 24
+
 class PhpBB3(object):
   KNOWN_OPERATIONS = (
     'fetch',
@@ -406,7 +408,7 @@ class PhpBB3SessionInterface(SessionInterface):
         user['username'] = user['username'].decode('utf-8', 'ignore')
     if not user:
       # Use anonymous user
-      user = app.phpbb3.get_user(user_id = 1)
+      user = app.phpbb3.cached_get_user(user_id=1, cache_ttl=ANONYMOUS_CACHE_TTL)
 
     # Create session
     session = self.session_class()
