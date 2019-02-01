@@ -2,3 +2,4 @@ build
 dist
 Flask*egg-info
 .vscode/
+.mypy_cache/

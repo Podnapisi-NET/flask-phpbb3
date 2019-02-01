@@ -2,11 +2,16 @@ from __future__ import absolute_import
 
 import functools
 import json
+import typing
 
+import flask
 import flask.sessions
+import flask.wrappers
 from flask import _app_ctx_stack as flask_stack
 
 import pkg_resources
+
+import werkzeug.contrib.cache
 
 __version__ = pkg_resources.get_distribution(__name__).version
 
@@ -33,13 +38,27 @@ class PhpBB3(object):
         'psycopg2',
     )
 
-    def __init__(self, app=None, cache=None):
-        self._functions = {}
+    def __init__(
+        self,
+        app=None,  # type: typing.Optional[flask.Flask]
+        cache=None,  # type: werkzeug.contrib.cache.BaseCache
+    ):
+        # type: (...) -> None
+        self._functions = {}  # type: dict
+
+        self._cache = werkzeug.contrib.cache.SimpleCache()\
+            # type: werkzeug.contrib.cache.BaseCache
+
         self.app = app
         if app is not None:
             self.init_app(app, cache)
 
-    def init_app(self, app, cache=None):
+    def init_app(
+        self,
+        app,  # type: flask.Flask
+        cache=None  # type: werkzeug.contrib.cache.BaseCache
+    ):
+        # type: (...) -> None
         # Setup default configs
         self._config = {
             'general': dict(
@@ -67,23 +86,22 @@ class PhpBB3(object):
         )
 
         # Use passed in cache interface (see Flask-Cache extension)
-        self._cache = cache
-        if self._cache is None:
+        if not cache:
             # Setup our own
             cache_backend = self._config['session_backend'].get('TYPE',
                                                                 'simple')
-            if cache_backend == 'simple':
-                from werkzeug.contrib.cache import SimpleCache
-                self._cache = SimpleCache()
-            elif cache_backend == 'memcached':
-                from werkzeug.contrib.cache import MemcachedCache
+            if cache_backend == 'memcached':
                 key_prefix = self._config['session_backend'].get('KEY_PREFIX',
                                                                  'phpbb3')
-                self._cache = MemcachedCache(
+                self._cache = werkzeug.contrib.cache.MemcachedCache(
                     self._config['session_backend'].get('SERVERS',
                                                         ['127.0.0.1:11211']),
                     key_prefix=key_prefix,
                 )
+            else:
+                self._cache = werkzeug.contrib.cache.SimpleCache()
+        else:
+            self._cache = cache
 
         # Setup available SQL functions
         self._prepare_statements()
@@ -100,6 +118,7 @@ class PhpBB3(object):
 
     @property
     def _db(self):
+        # type: () -> typing.Any
         """Returns database connection."""
         ctx = flask_stack.top
         if ctx is not None:
@@ -116,6 +135,7 @@ class PhpBB3(object):
             return ctx.phpbb3_db
 
     def _prepare_statements(self):
+        # type: () -> None
         """
         Initializes prepared SQL statements, depending on version of PHPBB3
         """
@@ -181,18 +201,22 @@ class PhpBB3(object):
 
         # TODO Add/Move to version specific queries
 
-    def _sql_query(self,
-                   operation,
-                   query,
-                   cache_key=None,
-                   cache_ttl=None,
-                   skip=0,
-                   limit=10,
-                   **kwargs):
+    def _sql_query(
+        self,
+        operation,  # type: str
+        query,  # type: str
+        cache_key=None,  # type: typing.Optional[str]
+        cache_ttl=None,  # type: typing.Optional[int]
+        skip=0,  # type: int
+        limit=10,  # type: typing.Optional[int]
+        **kwargs  # type: int
+    ):
+        # type: (...) -> typing.Any
         """Executes a query with values in kwargs."""
         if operation not in self.KNOWN_OPERATIONS:
             raise ValueError("Unknown operation")
 
+        versioned_cache_key = None
         if cache_key and operation != 'set':
             versioned_cache_key = '{name}:{arguments}'.format(
                 name=cache_key,
@@ -200,14 +224,12 @@ class PhpBB3(object):
                                    for key, value in kwargs.items())
             )
             raw_data = self._cache.get(versioned_cache_key)
-            if raw_data and isinstance(raw_data, basestring):
+            if raw_data and isinstance(raw_data, (str, unicode)):
                 try:
                     return json.loads(raw_data)
                 except ValueError:
                     # Woops :S
                     pass
-        else:
-            versioned_cache_key = None
 
         # FIXME Driver specific code!
         c = self._db.cursor()
@@ -248,6 +270,7 @@ class PhpBB3(object):
         return output
 
     def __getattr__(self, name):
+        # type: (str) -> typing.Callable
         parsed_name = name.split('_')
         is_cached = False
         if parsed_name[0] == 'cached':
@@ -277,6 +300,7 @@ class PhpBB3(object):
             )
 
     def teardown(self, exception):
+        # type: (typing.Any) -> None
         ctx = flask_stack.top
         if hasattr(ctx, 'phphbb3_db'):
             ctx.phpbb3_db.close()
@@ -284,38 +308,44 @@ class PhpBB3(object):
 
 class PhpBB3Session(dict, flask.session.SessionMixin):
     def __init__(self):
+        # type: () -> None
         # Some session related variables
         self.modified = False
         self.new = False
-        self._read_only_properties = set([])
+        self._read_only_properties = set([])  # type: set
 
         # Some ACL related things
-        self._acl_options = None
-        self._acl = None
-        self._acl_cache = {}
+        self._acl_options = None  # type: typing.Optional[dict]
+        self._acl = None  # type: typing.Optional[dict]
+        self._acl_cache = {}  # type: typing.Dict[str, typing.Dict[str, bool]]
 
         # Per request cache
         # This should not be cached into session, but per
         # request should not be executed multiple times
-        self._request_cache = {}
+        self._request_cache = {}  # type: dict
 
     def __setitem__(self, key, value):
+        # type: (str, str) -> None
         modified = self.get(key) != value
         super(PhpBB3Session, self).__setitem__(key, value)
         if key not in self._read_only_properties:
             self.modified = modified
 
     def pop(self, *args, **kwargs):
+        # type: (*typing.Any, **typing.Any) -> typing.Any
         """Wrapper to set modified."""
         self.modified = True
         return super(PhpBB3Session, self).pop(*args, **kwargs)
 
     @property
     def is_authenticated(self):
+        # type: () -> bool
         """Helper method to test if user is authenticated."""
-        return self.get('user_id', 1) > 1
+        user_id = int(self.get('user_id', 1))
+        return user_id > 1
 
     def is_member(self, group):
+        # type: (typing.Union[int, str]) -> bool
         """Tests if user is a member of specified group."""
         from flask import current_app
 
@@ -325,18 +355,19 @@ class PhpBB3Session(dict, flask.session.SessionMixin):
                 return True
 
             # Access database
-            return current_app.phpbb3.has_membership(
+            return bool(current_app.phpbb3.has_membership(
                 user_id=self['user_id'],
                 group_id=group
-            )
+            ))
         else:
             # Use group name
-            return current_app.phpbb3.has_membership_resolve(
+            return bool(current_app.phpbb3.has_membership_resolve(
                 user_id=self['user_id'],
                 group_name=group
-            )
+            ))
 
     def _load_acl(self):
+        # type: () -> None
         if self._acl is not None and self._acl_options:
             # Nothing to load/convert
             return
@@ -375,7 +406,7 @@ class PhpBB3Session(dict, flask.session.SessionMixin):
 
         if not self._acl:
             # Load/transform user's ACL data
-            seq_cache = {}
+            seq_cache = {}  # type: dict
             self._acl = {}
 
             split_user_permissions = self['user_permissions']\
@@ -399,50 +430,62 @@ class PhpBB3Session(dict, flask.session.SessionMixin):
                     self._acl[str(f)] += converted
 
     def has_privilege(self, option, forum_id=0):
+        # type: (str, int) -> bool
         """Test if user has global or local (if forum_id is set) privileges."""
         # We load the ACL
         self._load_acl()
 
         # Make sure it is int, and convert it into str for mapping purposes
-        forum_id = str(int(forum_id))
+        str_forum_id = str(int(forum_id))
 
         # Parse negation
         negated = option.startswith('!')
         if negated:
             option = option[1:]
 
-        if forum_id not in self._acl_cache\
-           or option not in self._acl_cache[forum_id]:
+        if str_forum_id not in self._acl_cache\
+           or option not in self._acl_cache[str_forum_id]:
             # Default is, no permission
-            self._acl_cache.setdefault(forum_id, {})[option] = False
+            self._acl_cache.setdefault(str_forum_id, {})[option] = False
 
             # Global permissions...
-            if option in self._acl_options['global'] and '0' in self._acl:
+            if self._acl_options\
+               and isinstance(self._acl, dict)\
+               and option in self._acl_options['global']\
+               and '0' in self._acl:
                 try:
                     acl_option = self._acl_options['global'][option]
                     permission = self._acl['0'][acl_option]
-                    self._acl_cache[forum_id][option] = bool(int(permission))
+                    self._acl_cache[str_forum_id][option] =\
+                        bool(int(permission))
                 except IndexError:
                     pass
 
             # Local permissions...
-            if forum_id != '0' and option in self._acl_options['local']:
+            if str_forum_id != '0'\
+               and self._acl_options\
+               and self._acl\
+               and option in self._acl_options['local']:
                 try:
                     acl_option = self._acl_options['local'][option]
-                    permission = self._acl.get(forum_id, '0' * 31)[acl_option]
-                    self._acl_cache[forum_id][option] |= bool(int(permission))
+                    permission =\
+                        self._acl.get(str_forum_id, '0' * 31)[acl_option]
+                    self._acl_cache[str_forum_id][option] |=\
+                        bool(int(permission))
                 except IndexError:
                     pass
 
-        return negated ^ self._acl_cache[forum_id][option]
+        return negated ^ self._acl_cache[str_forum_id][option]
 
     def has_privileges(self, *options, **kwargs):
+        # type: (*str, **typing.Any) -> bool
         output = False
         for option in options:
             output |= self.has_privilege(option, **kwargs)
         return output
 
     def get_link_hash(self, link):
+        # type: (str) -> str
         """Returns link hash."""
         if not self.is_authenticated:
             return ''
@@ -452,6 +495,7 @@ class PhpBB3Session(dict, flask.session.SessionMixin):
 
     @property
     def num_unread_notifications(self):
+        # type: () -> int
         """Returns number of unread notifications."""
         from flask import current_app
         if 'num_unread_notifications' not in self._request_cache:
@@ -459,7 +503,7 @@ class PhpBB3Session(dict, flask.session.SessionMixin):
                 current_app.phpbb3.get_unread_notifications_count(
                     user_id=self['user_id']
                 )['num']
-        return self._request_cache['num_unread_notifications']
+        return int(self._request_cache['num_unread_notifications'])
 
 
 class PhpBB3SessionInterface(flask.session.SessionInterface):
@@ -467,12 +511,14 @@ class PhpBB3SessionInterface(flask.session.SessionInterface):
     session_class = PhpBB3Session
 
     def __init__(self, app):
+        # type: (flask.Flask) -> None
         """
         Initializes session interface with app
         """
         self.cache = app.phpbb3._cache
 
     def open_session(self, app, request):
+        # type: (flask.Flask, flask.wrappers.Request) -> PhpBB3Session
         cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
 
         session_id = request.args.get('sid', type=str)\
@@ -517,6 +563,7 @@ class PhpBB3SessionInterface(flask.session.SessionInterface):
         return session
 
     def save_session(self, app, session, response):
+        # type: (flask.Flask, PhpBB3Session, flask.wrappers.Response) -> None
         """Currenlty does nothing."""
         if session.modified and session._read_only_properties:
             # Store all 'storable' properties
