@@ -1,5 +1,9 @@
 from __future__ import absolute_import
 
+import pkg_resources
+
+__version__ = pkg_resources.get_distribution(__name__).version
+
 try:
   import psycopg2
   import psycopg2.extras
