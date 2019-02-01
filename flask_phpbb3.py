@@ -41,8 +41,10 @@ class PhpBB3(object):
         # Setup default configs
         self._config = {
             'general': dict (
-                DRIVER='psycopg2', # TODO Add other drivers and reusability from other extensions
-                VERSION='3.1', # TODO Currenlty only 3.1 is available
+                # TODO Add other drivers and reusability from other extensions
+                DRIVER='psycopg2',
+                # TODO Currenlty only 3.1 is available
+                VERSION='3.1',
             ),
             'db': dict(
                 HOST='127.0.0.1',
@@ -58,21 +60,27 @@ class PhpBB3(object):
         # Load configs
         self._config['general'].update(app.config.get('PHPBB3', {}))
         self._config['db'].update(app.config.get('PHPBB3_DATABASE', {}))
-        self._config['session_backend'].update(app.config.get('PHPBB3_SESSION_BACKEND', {}))
+        self._config['session_backend'].update(
+            app.config.get('PHPBB3_SESSION_BACKEND', {})
+        )
 
         # Use passed in cache interface (see Flask-Cache extension)
         self._cache = cache
         if self._cache is None:
             # Setup our own
-            cache_backend = self._config['session_backend'].get('TYPE', 'simple')
+            cache_backend = self._config['session_backend'].get('TYPE',
+                                                                'simple')
             if cache_backend == 'simple':
                 from werkzeug.contrib.cache import SimpleCache
                 self._cache = SimpleCache()
             elif cache_backend == 'memcached':
                 from werkzeug.contrib.cache import MemcachedCache
+                key_prefix = self._config['session_backend'].get('KEY_PREFIX',
+                                                                 'phpbb3')
                 self._cache = MemcachedCache(
-                    self._config['session_backend'].get('SERVERS', ['127.0.0.1:11211']),
-                    key_prefix=self._config['session_backend'].get('KEY_PREFIX', 'phpbb3')
+                    self._config['session_backend'].get('SERVERS',
+                                                        ['127.0.0.1:11211']),
+                    key_prefix=key_prefix,
                 )
 
         # Setup available SQL functions
@@ -93,54 +101,92 @@ class PhpBB3(object):
         """Returns database connection."""
         ctx = stack.top
         if ctx is not None:
-            # Connect when there is no connection or we have a closed connection
+            # Connect when there is no connection or we have a closed
+            # connection
             if not hasattr(ctx, 'phpbb3_db') or ctx.phpbb3_db.closed:
                 ctx.phpbb3_db = psycopg2.connect(
-                    'dbname={DATABASE} host={HOST} user={USER} password={PASSWORD}'.format(**self._config['db']),
+                    'dbname={DATABASE}'
+                    ' host={HOST}'
+                    ' user={USER}'
+                    ' password={PASSWORD}'.format(**self._config['db']),
                     connection_factory=psycopg2.extras.DictConnection
                 )
             return ctx.phpbb3_db
 
     def _prepare_statements(self):
-        """Initializes prepared SQL statements, depending on version of PHPBB3."""
+        """
+        Initializes prepared SQL statements, depending on version of PHPBB3
+        """
         self._functions.update(dict(
-            get_autologin="SELECT u.* "
-                          "FROM {TABLE_PREFIX}users u, {TABLE_PREFIX}sessions_keys k "
-                          "WHERE u.user_type IN (0, 3)" # FIXME Make it prettier, USER_NORMAL and USER_FOUNDER
-                          "AND k.user_id=u.user_id"
-                          "AND k.key_id = %(key)s",
-            get_session="SELECT * "
-                        "FROM {TABLE_PREFIX}sessions s, {TABLE_PREFIX}users u "
-                        "WHERE s.session_id = %(session_id)s "
-                        "AND s.session_user_id=u.user_id",
-            get_user="SELECT * "
-                     "FROM {TABLE_PREFIX}users "
-                     "WHERE user_id = %(user_id)s",
-            has_membership="SELECT ug.group_id "
-                           "FROM {TABLE_PREFIX}user_group ug "
-                           "WHERE ug.user_id = %(user_id)s "
-                           "  AND ug.group_id = %(group_id)s "
-                           "  AND ug.user_pending=0 "
-                           "LIMIT 1",
-            has_membership_resolve="SELECT ug.group_id "
-                                   "FROM {TABLE_PREFIX}user_group ug, {TABLE_PREFIX}groups g "
-                                   "WHERE ug.user_id = %(user_id)s "
-                                   "  AND g.group_name = %(group_name)s "
-                                   "  AND ug.group_id=g.group_id "
-                                   "  AND ug.user_pending=0 "
-                                   "LIMIT 1",
-            fetch_acl_options="SELECT * FROM {TABLE_PREFIX}acl_options ORDER BY auth_option_id",
-            get_unread_notifications_count="SELECT COUNT(n.*) as num "
-                                           "FROM {TABLE_PREFIX}notifications n, {TABLE_PREFIX}notification_types nt "
-                                           "WHERE n.user_id = %(user_id)s "
-                                           "  AND nt.notification_type_id=n.notification_type_id "
-                                           "  AND nt.notification_type_enabled=1 "
-                                           "  AND n.notification_read=0",
+            get_autologin=(
+                "SELECT u.* "
+                "FROM {TABLE_PREFIX}users u,"
+                "     {TABLE_PREFIX}sessions_keys k "
+                # FIXME Make it prettier, USER_NORMAL and USER_FOUNDER
+                "WHERE u.user_type IN (0, 3)"
+                "AND k.user_id=u.user_id"
+                "AND k.key_id = %(key)s"
+            ),
+            get_session=(
+                "SELECT * "
+                "FROM {TABLE_PREFIX}sessions s, {TABLE_PREFIX}users u "
+                "WHERE s.session_id = %(session_id)s "
+                "AND s.session_user_id=u.user_id"
+            ),
+            get_user=(
+                "SELECT * "
+                "FROM {TABLE_PREFIX}users "
+                "WHERE user_id = %(user_id)s"),
+            has_membership=(
+                "SELECT ug.group_id "
+                "FROM {TABLE_PREFIX}user_group ug "
+                "WHERE ug.user_id = %(user_id)s "
+                "  AND ug.group_id = %(group_id)s "
+                "  AND ug.user_pending=0 "
+                "LIMIT 1"
+            ),
+            has_membership_resolve=(
+                "SELECT ug.group_id "
+                "FROM {TABLE_PREFIX}user_group ug,"
+                "     {TABLE_PREFIX}groups g "
+                "WHERE ug.user_id = %(user_id)s "
+                "  AND g.group_name = %(group_name)s "
+                "  AND ug.group_id=g.group_id "
+                "  AND ug.user_pending=0 "
+                "LIMIT 1"
+            ),
+            fetch_acl_options=(
+                "SELECT"
+                "   *"
+                " FROM"
+                "   {TABLE_PREFIX}acl_options"
+                " ORDER BY"
+                "   auth_option_id"
+            ),
+            get_unread_notifications_count=(
+                "SELECT"
+                "   COUNT(n.*) as num"
+                " FROM"
+                "   {TABLE_PREFIX}notifications n,"
+                "   {TABLE_PREFIX}notification_types nt"
+                " WHERE"
+                "   n.user_id = %(user_id)s "
+                "   AND nt.notification_type_id=n.notification_type_id"
+                "   AND nt.notification_type_enabled=1 "
+                "   AND n.notification_read=0"
+            ),
         ))
 
         # TODO Add/Move to version specific queries
 
-    def _sql_query(self, operation, query, cache_key=None, cache_ttl=None, skip=0, limit=10, **kwargs):
+    def _sql_query(self,
+                   operation,
+                   query,
+                   cache_key=None,
+                   cache_ttl=None,
+                   skip=0,
+                   limit=10,
+                   **kwargs):
         """Executes a query with values in kwargs."""
         if operation not in self.KNOWN_OPERATIONS:
             raise ValueError("Unknown operation")
@@ -148,7 +194,8 @@ class PhpBB3(object):
         if cache_key and operation != 'set':
             versioned_cache_key = '{name}:{arguments}'.format(
                 name=cache_key,
-                arguments=':'.join(key + str(value) for key, value in kwargs.items())
+                arguments=':'.join(key + str(value)
+                                   for key, value in kwargs.items())
             )
             raw_data = self._cache.get(versioned_cache_key)
             if raw_data and isinstance(raw_data, basestring):
@@ -189,7 +236,9 @@ class PhpBB3(object):
 
         if versioned_cache_key:
             try:
-                self._cache.set(versioned_cache_key, json.dumps(output), cache_ttl)
+                self._cache.set(versioned_cache_key,
+                                json.dumps(output),
+                                cache_ttl)
             except ValueError:
                 # Woops :S
                 pass
@@ -210,7 +259,9 @@ class PhpBB3(object):
             cache_key = prepared_statement
 
         if prepared_statement not in self._functions:
-            raise AttributeError("Function {} does not exist.".format(prepared_statement))
+            raise AttributeError("Function {} does not exist.".format(
+                prepared_statement
+            ))
 
         func_or_query = self._functions[prepared_statement]
         if callable(func_or_query):
@@ -273,12 +324,16 @@ class PhpBB3Session(dict, SessionMixin):
                 return True
 
             # Access database
-            return current_app.phpbb3.has_membership(user_id=self['user_id'],
-                                                     group_id=group)
+            return current_app.phpbb3.has_membership(
+                user_id=self['user_id'],
+                group_id=group
+            )
         else:
             # Use group name
-            return current_app.phpbb3.has_membership_resolve(user_id=self['user_id'],
-                                                             group_name=group)
+            return current_app.phpbb3.has_membership_resolve(
+                user_id=self['user_id'],
+                group_name=group
+            )
 
     def _load_acl(self):
         if self._acl is not None and self._acl_options:
@@ -299,14 +354,20 @@ class PhpBB3Session(dict, SessionMixin):
             local_index = 0
             global_index = 0
 
-            for opt in current_app.phpbb3.cached_fetch_acl_options(cache_ttl=ACL_OPTIONS_CACHE_TTL, limit=None):
+            for opt in current_app.phpbb3.cached_fetch_acl_options(
+                cache_ttl=ACL_OPTIONS_CACHE_TTL,
+                limit=None
+            ):
                 if opt['is_local'] == 1:
-                    self._acl_options['local'][opt['auth_option']] = local_index
+                    self._acl_options['local'][opt['auth_option']] =\
+                        local_index
                     local_index += 1
                 if opt['is_global'] == 1:
-                    self._acl_options['global'][opt['auth_option']] = global_index
+                    self._acl_options['global'][opt['auth_option']] =\
+                        global_index
                     global_index += 1
-                # TODO By looking phpbb3 code, here also comes translation option <=> id
+                # TODO By looking phpbb3 code, here also comes translation
+                # option <=> id
 
             # Store it into cache
             current_app.phpbb3._cache.set('_acl_options', self._acl_options)
@@ -316,7 +377,10 @@ class PhpBB3Session(dict, SessionMixin):
             seq_cache = {}
             self._acl = {}
 
-            for f, perms in enumerate(self['user_permissions'].rstrip().splitlines()):
+            split_user_permissions = self['user_permissions']\
+                .rstrip()\
+                .splitlines()
+            for f, perms in enumerate(split_user_permissions):
                 if not perms:
                     continue
 
@@ -327,7 +391,9 @@ class PhpBB3Session(dict, SessionMixin):
                         converted = seq_cache[sub]
                     else:
                         converted = bin(int(sub, 36))[2:]
-                        converted = seq_cache[sub] = '0' * (31 - len(converted)) + converted
+                        converted = seq_cache[sub] = '0'\
+                                                     * (31 - len(converted))\
+                                                     + converted
 
                     self._acl[str(f)] += converted
 
@@ -344,21 +410,26 @@ class PhpBB3Session(dict, SessionMixin):
         if negated:
             option = option[1:]
 
-        if forum_id not in self._acl_cache or option not in self._acl_cache[forum_id]:
+        if forum_id not in self._acl_cache\
+           or option not in self._acl_cache[forum_id]:
             # Default is, no permission
             self._acl_cache.setdefault(forum_id, {})[option] = False
 
             # Global permissions...
             if option in self._acl_options['global'] and '0' in self._acl:
                 try:
-                    self._acl_cache[forum_id][option] = bool(int(self._acl['0'][self._acl_options['global'][option]]))
+                    acl_option = self._acl_options['global'][option]
+                    permission = self._acl['0'][acl_option]
+                    self._acl_cache[forum_id][option] = bool(int(permission))
                 except IndexError:
                     pass
 
             # Local permissions...
             if forum_id != '0' and option in self._acl_options['local']:
                 try:
-                    self._acl_cache[forum_id][option] |= bool(int(self._acl.get(forum_id, '0' * 31)[self._acl_options['local'][option]]))
+                    acl_option = self._acl_options['local'][option]
+                    permission = self._acl.get(forum_id, '0' * 31)[acl_option]
+                    self._acl_cache[forum_id][option] |= bool(int(permission))
                 except IndexError:
                     pass
 
@@ -383,7 +454,10 @@ class PhpBB3Session(dict, SessionMixin):
         """Returns number of unread notifications."""
         from flask import current_app
         if 'num_unread_notifications' not in self._request_cache:
-            self._request_cache['num_unread_notifications'] = current_app.phpbb3.get_unread_notifications_count(user_id=self['user_id'])['num']
+            self._request_cache['num_unread_notifications'] =\
+                current_app.phpbb3.get_unread_notifications_count(
+                    user_id=self['user_id']
+                )['num']
         return self._request_cache['num_unread_notifications']
 
 class PhpBB3SessionInterface(SessionInterface):
@@ -391,13 +465,16 @@ class PhpBB3SessionInterface(SessionInterface):
     session_class = PhpBB3Session
 
     def __init__(self, app):
-        """Initializes session interface with app and possible cache (Flask-Cache) object for storing additional data."""
+        """
+        Initializes session interface with app
+        """
         self.cache = app.phpbb3._cache
 
     def open_session(self, app, request):
         cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
 
-        session_id = request.args.get('sid', type=str) or request.cookies.get(cookie_name + 'sid', None)
+        session_id = request.args.get('sid', type=str)\
+            or request.cookies.get(cookie_name + 'sid', None)
         if not session_id:
             session_id = None
 
@@ -409,7 +486,10 @@ class PhpBB3SessionInterface(SessionInterface):
                 user['username'] = user['username'].decode('utf-8', 'ignore')
         if not user:
             # Use anonymous user
-            user = app.phpbb3.cached_get_user(user_id=1, cache_ttl=ANONYMOUS_CACHE_TTL)
+            user = app.phpbb3.cached_get_user(
+                user_id=1,
+                cache_ttl=ANONYMOUS_CACHE_TTL
+            )
 
         # Create session
         session = self.session_class()
@@ -438,8 +518,14 @@ class PhpBB3SessionInterface(SessionInterface):
         """Currenlty does nothing."""
         if session.modified and session._read_only_properties:
             # Store all 'storable' properties
-            data = dict([(k, v) for k, v in session.items() if k not in session._read_only_properties])
+            data = dict([(k, v)
+                         for k, v in session.items()
+                         if k not in session._read_only_properties])
 
             if 'session_id' in session:
                 # TODO Read session validity from phpbb3 config
-                self.cache.set('sessions_' + session['session_id'], json.dumps(data), timeout=int(3600 * 1.5))
+                self.cache.set(
+                    'sessions_' + session['session_id'],
+                    json.dumps(data),
+                    timeout=int(3600 * 1.5)
+                )
