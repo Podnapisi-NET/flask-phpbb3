@@ -18,6 +18,7 @@ import functools
 from flask import _app_ctx_stack as stack
 
 ANONYMOUS_CACHE_TTL = 3600 * 24
+ACL_OPTIONS_CACHE_TTL = 3600 * 1
 
 class PhpBB3(object):
   KNOWN_OPERATIONS = (
@@ -298,7 +299,7 @@ class PhpBB3Session(dict, SessionMixin):
       local_index = 0
       global_index = 0
 
-      for opt in current_app.phpbb3.fetch_acl_options(limit = None):
+      for opt in current_app.phpbb3.cached_fetch_acl_options(cache_ttl=ACL_OPTIONS_CACHE_TTL, limit=None):
         if opt['is_local'] == 1:
           self._acl_options['local'][opt['auth_option']] = local_index
           local_index += 1
