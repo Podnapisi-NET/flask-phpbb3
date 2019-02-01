@@ -16,9 +16,11 @@ import json
 import functools
 
 from flask import _app_ctx_stack as stack
+from flask.sessions import SessionMixin, SessionInterface
 
 ANONYMOUS_CACHE_TTL = 3600 * 24
 ACL_OPTIONS_CACHE_TTL = 3600 * 1
+
 
 class PhpBB3(object):
     KNOWN_OPERATIONS = (
@@ -40,7 +42,7 @@ class PhpBB3(object):
     def init_app(self, app, cache=None):
         # Setup default configs
         self._config = {
-            'general': dict (
+            'general': dict(
                 # TODO Add other drivers and reusability from other extensions
                 DRIVER='psycopg2',
                 # TODO Currenlty only 3.1 is available
@@ -279,7 +281,6 @@ class PhpBB3(object):
         if hasattr(ctx, 'phphbb3_db'):
             ctx.phpbb3_db.close()
 
-from flask.sessions import SessionMixin, SessionInterface
 
 class PhpBB3Session(dict, SessionMixin):
     def __init__(self):
@@ -459,6 +460,7 @@ class PhpBB3Session(dict, SessionMixin):
                     user_id=self['user_id']
                 )['num']
         return self._request_cache['num_unread_notifications']
+
 
 class PhpBB3SessionInterface(SessionInterface):
     """A read-only session interface to access phpBB3 session."""
