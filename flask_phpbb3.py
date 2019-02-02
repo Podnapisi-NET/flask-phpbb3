@@ -306,7 +306,7 @@ class PhpBB3(object):
             ctx.phpbb3_db.close()
 
 
-class PhpBB3Session(dict, flask.session.SessionMixin):
+class PhpBB3Session(dict, flask.sessions.SessionMixin):
     def __init__(self):
         # type: () -> None
         # Some session related variables
@@ -506,7 +506,7 @@ class PhpBB3Session(dict, flask.session.SessionMixin):
         return int(self._request_cache['num_unread_notifications'])
 
 
-class PhpBB3SessionInterface(flask.session.SessionInterface):
+class PhpBB3SessionInterface(flask.sessions.SessionInterface):
     """A read-only session interface to access phpBB3 session."""
     session_class = PhpBB3Session
 
