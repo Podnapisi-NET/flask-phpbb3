@@ -63,6 +63,15 @@ class TestWithDatabase(unittest.TestCase):
                 'Done :o'
             )
 
+        @self.app.route('/priv_test')
+        def test_privileges():
+            # type: () -> typing.Any
+            return flask.render_template_string(
+                "{{ session.has_privilege('m_edit') }},"
+                "{{ session.has_privilege('m_delete') }},"
+                "{{ session.is_authenticated }}"
+            )
+
         self.ctx = self.app.app_context()
         self.ctx.push()
         # Inject connection
@@ -100,6 +109,38 @@ class TestGetUser(TestWithDatabase):
         # type: () -> None
         unknown_user = self.app.phpbb3.get_user(user_id=2)
         self.assertEqual(unknown_user, None)
+
+
+class TestFetch(TestWithDatabase):
+    def test_paging(self):
+        # type: () -> None
+        _create_privilege(self.cursor, 'm_edit')
+        _create_privilege(self.cursor, 'm_delete')
+        _create_privilege(self.cursor, 'm_some_random')
+
+        expected_privileges = [(0, [{
+            'auth_option': 'm_edit',
+            'auth_option_id': 1,
+            'founder_only': 0,
+            'is_global': 1,
+            'is_local': 0,
+        }]), (1, [{
+            'auth_option': 'm_delete',
+            'auth_option_id': 2,
+            'founder_only': 0,
+            'is_global': 1,
+            'is_local': 0,
+        }]), (2, [{
+            'auth_option': 'm_some_random',
+            'auth_option_id': 3,
+            'founder_only': 0,
+            'is_global': 1,
+            'is_local': 0,
+        }]), (3, [])]
+
+        for skip in range(0, 4):
+            privilege = self.app.phpbb3.fetch_acl_options(skip=skip, limit=1)
+            self.assertEqual((skip, privilege), expected_privileges[skip])
 
 
 class TestSession(TestWithDatabase):
@@ -152,6 +193,22 @@ class TestSession(TestWithDatabase):
         data = self.client.get('/data').data
         self.assertEqual(data, 'something')
 
+    def test_privilege(self):
+        # type: () -> None
+        _create_user(self.cursor)
+        _create_session(self.cursor, self.session_id, 2)
+        _create_privilege(self.cursor, 'm_edit')
+        _grant_privilege(self.cursor, 2)
+
+        data = self.client.get('/priv_test').data
+        self.assertEqual(data, 'False,False,False')
+
+        # We do a login via phpbb3 :P
+        self.client.set_cookie('127.0.0.1', 'phpbb3_sid', self.session_id)
+
+        data = self.client.get('/priv_test').data
+        self.assertEqual(data, 'True,False,True')
+
 
 def _create_user(cursor):
     # type: (psycopg2.extensions.cursor) -> None
@@ -170,6 +227,32 @@ def _create_session(cursor, session_id, user_id):
         " values (%(session_id)s, %(user_id)s)", {
             'session_id': session_id,
             'user_id': user_id,
+        }
+    )
+
+
+def _create_privilege(cursor, privilege):
+    # type: (psycopg2.extensions.cursor, str) -> None
+    cursor.execute(
+        "insert into"
+        " phpbb_acl_options (auth_option, is_global)"
+        " values (%(privilege)s, 1)", {
+            'privilege': privilege,
+        }
+    )
+
+
+def _grant_privilege(cursor, user_id):
+    # type: (psycopg2.extensions.cursor, int) -> None
+    # Cryptic value to  allow only m_edit permission
+    permission_set = 'HRA0HS'
+    cursor.execute(
+        "update phpbb_users"
+        " set"
+        " user_permissions=%(permission_set)s"
+        " where user_id=%(user_id)s", {
+            'user_id': user_id,
+            'permission_set': permission_set,
         }
     )
 
