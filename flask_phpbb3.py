@@ -329,13 +329,23 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
         modified = self.get(key) != value
         super(PhpBB3Session, self).__setitem__(key, value)
         if key not in self._read_only_properties:
-            self.modified = modified
+            self.modified |= modified
+
+    def __delitem__(self, key):
+        # type: (str) -> None
+        super(PhpBB3Session, self).__delitem__(key)
+        self.modified = True
 
     def pop(self, *args, **kwargs):
         # type: (*typing.Any, **typing.Any) -> typing.Any
         """Wrapper to set modified."""
         self.modified = True
         return super(PhpBB3Session, self).pop(*args, **kwargs)
+
+    def clear(self):
+        # type: () -> None
+        self.modified = True
+        return super(PhpBB3Session, self).clear()
 
     @property
     def is_authenticated(self):
