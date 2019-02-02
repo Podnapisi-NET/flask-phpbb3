@@ -1,5 +1,13 @@
-build
-dist
+# Distribution
+build/
+dist/
+.eggs/
 Flask*egg-info
+# Local config
 .vscode/
+# Testing
 .mypy_cache/
+htmlcov/
+.coverage
+# Bytecode
+*.pyc
