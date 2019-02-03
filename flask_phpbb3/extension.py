@@ -30,43 +30,16 @@ class PhpBB3(object):
         cache=None  # type: werkzeug.contrib.cache.BaseCache
     ):
         # type: (...) -> None
-        # Setup default configs
-        self._config = {
-            'general': dict(
-                # TODO Add other drivers and reusability from other extensions
-                DRIVER='psycopg2',
-                # TODO Currenlty only 3.1 is available
-                VERSION='3.1',
-            ),
-            'db': dict(
-                HOST='127.0.0.1',
-                DATABASE='phpbb3',
-                USER='phpbb3',
-                PASSWORD='',
-                TABLE_PREFIX='phpbb_',
-            ),
-            'session_backend': dict(
-                TYPE='simple',
-            ),
-        }
-        # Load configs
-        self._config['general'].update(app.config.get('PHPBB3', {}))
-        self._config['db'].update(app.config.get('PHPBB3_DATABASE', {}))
-        self._config['session_backend'].update(
-            app.config.get('PHPBB3_SESSION_BACKEND', {})
-        )
+        self._ensure_default_config(app)
 
         # Use passed in cache interface (see Flask-Cache extension)
         if not cache:
             # Setup our own
-            cache_backend = self._config['session_backend'].get('TYPE',
-                                                                'simple')
+            cache_backend = app.config['PHPBB3_SESSION_BACKEND']['TYPE']
             if cache_backend == 'memcached':
-                key_prefix = self._config['session_backend'].get('KEY_PREFIX',
-                                                                 'phpbb3')
+                key_prefix = app.config['PHPBB3_SESSION_BACKEND']['KEY_PREFIX']
                 self._cache = werkzeug.contrib.cache.MemcachedCache(
-                    self._config['session_backend'].get('SERVERS',
-                                                        ['127.0.0.1:11211']),
+                    app.config['PHPBB3_SESSION_BACKEND']['SERVERS'],
                     key_prefix=key_prefix,
                 )
             else:
@@ -84,6 +57,32 @@ class PhpBB3(object):
         # TODO Is it wise to do it here? Should user do it himself?
         app.session_interface =\
             flask_phpbb3.sessions.PhpBB3SessionInterface(app)
+
+    @classmethod
+    def _ensure_default_config(cls, app):
+        # type: (flask.Flask) -> None
+        app.config.setdefault('PHPBB3', {})
+        app.config['PHPBB3'].setdefault('DRIVER', 'psycopg2')
+        app.config['PHPBB3'].setdefault('VERSION', '3.1')
+        app.config.setdefault('PHPBB3_DATABASE', {})
+        app.config['PHPBB3_DATABASE'].setdefault('HOST', '127.0.0.1')
+        app.config['PHPBB3_DATABASE'].setdefault('DATABASE', 'phpbb3')
+        app.config['PHPBB3_DATABASE'].setdefault('USER', 'phpbb3')
+        app.config['PHPBB3_DATABASE'].setdefault('PASSWORD', '')
+        app.config['PHPBB3_DATABASE'].setdefault('TABLE_PREFIX', 'phpbb_')
+        app.config.setdefault('PHPBB3_SESSION_BACKEND', {})
+        app.config['PHPBB3_SESSION_BACKEND'].setdefault('TYPE', 'simple')
+
+        # Conditional defaults
+        if app.config['PHPBB3_SESSION_BACKEND']['TYPE'] == 'memcached':
+            app.config['PHPBB3_SESSION_BACKEND'].setdefault(
+                'KEY_PREFIX',
+                'phpbb3'
+            )
+            app.config['PHPBB3_SESSION_BACKEND'].setdefault(
+                'SERVERS',
+                ['127.0.0.1:11211']
+            )
 
     @classmethod
     def _create_backend(
@@ -106,13 +105,15 @@ class PhpBB3(object):
     def _backend(self):
         # type: () -> flask_phpbb3.backends.base.BaseBackend
         """Returns phpbb3 backend"""
+        current_app = flask.current_app
+
         ctx = flask._app_ctx_stack.top
         if ctx is not None:
             if not hasattr(ctx, 'phpbb3_backend')\
                or ctx.phpbb3_backend.is_closed:
                 backend = PhpBB3._create_backend(
-                    self._config['general']['DRIVER'],
-                    self._config['db'],
+                    current_app.config['PHPBB3']['DRIVER'],
+                    current_app.config['PHPBB3_DATABASE'],
                     self._cache,
                 )
                 ctx.phpbb3_backend = backend
