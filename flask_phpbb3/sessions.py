@@ -12,7 +12,6 @@ import flask_phpbb3
 import werkzeug.contrib.cache
 
 ANONYMOUS_CACHE_TTL = 3600 * 24
-ACL_OPTIONS_CACHE_TTL = 3600 * 1
 
 
 class PhpBB3Session(dict, flask.sessions.SessionMixin):
@@ -45,8 +44,8 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
         super(PhpBB3Session, self).__delitem__(key)
         self.modified = True
 
-    @classmethod
-    def _phpbb3(cls):
+    @property
+    def _phpbb3(self):
         # type: () -> flask_phpbb3.PhpBB3
         output = flask.current_app.phpbb3  # type: flask_phpbb3.PhpBB3
         return output
@@ -85,13 +84,13 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
                 return True
 
             # Access database
-            output = self._phpbb3().has_membership(
+            output = self._phpbb3.has_membership(
                 user_id=self['user_id'],
                 group_id=group
             )
         else:
             # Use group name
-            output = self._phpbb3().has_membership_resolve(
+            output = self._phpbb3.has_membership_resolve(
                 user_id=self['user_id'],
                 group_name=group
             )
@@ -102,66 +101,11 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
 
     def _load_acl(self):
         # type: () -> None
-        if self._acl is not None and self._acl_options:
-            # Nothing to load/convert
-            return
-
-        # Fetch from cache
-        self._acl_options = self._cache.get('_acl_options')
-
-        if not self._acl_options:
-            # Load ACL options, so we can decode the user ACL
-            self._acl_options = {
-                'local': {},
-                'global': {}
-            }
-            local_index = 0
-            global_index = 0
-
-            results = self._phpbb3().fetch_acl_options(
-                cache=True,
-                cache_ttl=ACL_OPTIONS_CACHE_TTL,
-                limit=None,
-            )
-            for opt in results or []:
-                if opt['is_local'] == 1:
-                    self._acl_options['local'][opt['auth_option']] =\
-                        local_index
-                    local_index += 1
-                if opt['is_global'] == 1:
-                    self._acl_options['global'][opt['auth_option']] =\
-                        global_index
-                    global_index += 1
-                # TODO By looking phpbb3 code, here also comes translation
-                # option <=> id
-
-            # Store it into cache
-            self._cache.set('_acl_options', self._acl_options)
-
-        if not self._acl:
-            # Load/transform user's ACL data
-            seq_cache = {}  # type: dict
-            self._acl = {}
-
-            split_user_permissions = self['user_permissions']\
-                .rstrip()\
-                .splitlines()
-            for f, perms in enumerate(split_user_permissions):
-                if not perms:
-                    continue
-
-                # Do the conversion magic
-                self._acl[str(f)] = ''
-                for sub in [perms[j:j + 6] for j in range(0, len(perms), 6)]:
-                    if sub in seq_cache:
-                        converted = seq_cache[sub]
-                    else:
-                        converted = bin(int(sub, 36))[2:]
-                        converted = seq_cache[sub] = '0'\
-                                                     * (31 - len(converted))\
-                                                     + converted
-
-                    self._acl[str(f)] += converted
+        if self._acl_options is None:
+            self._acl_options = self._phpbb3._backend.fetch_acl()
+        if self._acl is None:
+            self._acl =\
+                self._phpbb3._backend.parse_user_acl(self['user_permissions'])
 
     def has_privilege(self, option, forum_id=0):
         # type: (str, int) -> bool
@@ -169,47 +113,12 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
         # We load the ACL
         self._load_acl()
 
-        # Make sure it is int, and convert it into str for mapping purposes
-        str_forum_id = str(int(forum_id))
-
-        # Parse negation
-        negated = option.startswith('!')
-        if negated:
-            option = option[1:]
-
-        if str_forum_id not in self._acl_cache\
-           or option not in self._acl_cache[str_forum_id]:
-            # Default is, no permission
-            self._acl_cache.setdefault(str_forum_id, {})[option] = False
-
-            # Global permissions...
-            if self._acl_options\
-               and isinstance(self._acl, dict)\
-               and option in self._acl_options['global']\
-               and '0' in self._acl:
-                try:
-                    acl_option = self._acl_options['global'][option]
-                    permission = self._acl['0'][acl_option]
-                    self._acl_cache[str_forum_id][option] =\
-                        bool(int(permission))
-                except IndexError:
-                    pass
-
-            # Local permissions...
-            if str_forum_id != '0'\
-               and self._acl_options\
-               and self._acl\
-               and option in self._acl_options['local']:
-                try:
-                    acl_option = self._acl_options['local'][option]
-                    permission =\
-                        self._acl.get(str_forum_id, '0' * 31)[acl_option]
-                    self._acl_cache[str_forum_id][option] |=\
-                        bool(int(permission))
-                except IndexError:
-                    pass
-
-        return negated ^ self._acl_cache[str_forum_id][option]
+        return self._phpbb3._backend.has_user_privilege(
+            self._acl or {},
+            self._acl_options or {},
+            option,
+            forum_id
+        )
 
     def has_privileges(self, *options, **kwargs):
         # type: (*str, **typing.Any) -> bool
@@ -232,7 +141,7 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
         # type: () -> int
         """Returns number of unread notifications."""
         if 'num_unread_notifications' not in self._request_cache:
-            result = self._phpbb3().get_unread_notifications_count(
+            result = self._phpbb3.get_unread_notifications_count(
                 user_id=self['user_id']
             )
             if result:
