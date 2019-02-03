@@ -9,6 +9,8 @@ import flask.wrappers
 
 import flask_phpbb3
 
+import werkzeug.contrib.cache
+
 ANONYMOUS_CACHE_TTL = 3600 * 24
 ACL_OPTIONS_CACHE_TTL = 3600 * 1
 
@@ -47,6 +49,13 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
     def _phpbb3(cls):
         # type: () -> flask_phpbb3.PhpBB3
         output = flask.current_app.phpbb3  # type: flask_phpbb3.PhpBB3
+        return output
+
+    @property
+    def _cache(self):
+        # type: () -> werkzeug.contrib.cache.BaseCache
+        output = flask.current_app.phpbb3_cache\
+            # type: werkzeug.contrib.cache.BaseCache
         return output
 
     def pop(self, *args, **kwargs):
@@ -98,7 +107,7 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
             return
 
         # Fetch from cache
-        self._acl_options = self._phpbb3()._cache.get('_acl_options')
+        self._acl_options = self._cache.get('_acl_options')
 
         if not self._acl_options:
             # Load ACL options, so we can decode the user ACL
@@ -127,7 +136,7 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
                 # option <=> id
 
             # Store it into cache
-            self._phpbb3()._cache.set('_acl_options', self._acl_options)
+            self._cache.set('_acl_options', self._acl_options)
 
         if not self._acl:
             # Load/transform user's ACL data
@@ -242,12 +251,11 @@ class PhpBB3SessionInterface(flask.sessions.SessionInterface):
     """A read-only session interface to access phpBB3 session."""
     session_class = PhpBB3Session
 
-    def __init__(self, app):
-        # type: (flask.Flask) -> None
-        """
-        Initializes session interface with app
-        """
-        self.cache = app.phpbb3._cache
+    @classmethod
+    def _cache(cls, app):
+        # type: (flask.Flask) -> werkzeug.contrib.cache.BaseCache
+        output = app.phpbb3_cache  # type: werkzeug.contrib.cache.BaseCache
+        return output
 
     def open_session(self, app, request):
         # type: (flask.Flask, flask.wrappers.Request) -> PhpBB3Session
@@ -286,7 +294,8 @@ class PhpBB3SessionInterface(flask.sessions.SessionInterface):
 
             # Read from local storage backend
             if 'session_id' in session:
-                data = self.cache.get('sessions_' + session['session_id'])
+                cache = self._cache(app)
+                data = cache.get('sessions_' + session['session_id'])
                 try:
                     data = json.loads(data or '')
                 except ValueError:
@@ -310,7 +319,7 @@ class PhpBB3SessionInterface(flask.sessions.SessionInterface):
 
             if 'session_id' in session:
                 # TODO Read session validity from phpbb3 config
-                self.cache.set(
+                self._cache(app).set(
                     'sessions_' + session['session_id'],
                     json.dumps(data),
                     timeout=int(3600 * 1.5)

@@ -17,9 +17,6 @@ class PhpBB3(object):
         cache=None,  # type: werkzeug.contrib.cache.BaseCache
     ):
         # type: (...) -> None
-        self._cache = werkzeug.contrib.cache.SimpleCache()\
-            # type: werkzeug.contrib.cache.BaseCache
-
         self.app = app
         if app is not None:
             self.init_app(app, cache)
@@ -27,7 +24,7 @@ class PhpBB3(object):
     def init_app(
         self,
         app,  # type: flask.Flask
-        cache=None  # type: werkzeug.contrib.cache.BaseCache
+        cache=None  # type: typing.Optional[werkzeug.contrib.cache.BaseCache]
     ):
         # type: (...) -> None
         self._ensure_default_config(app)
@@ -38,25 +35,26 @@ class PhpBB3(object):
             cache_backend = app.config['PHPBB3_SESSION_BACKEND']['TYPE']
             if cache_backend == 'memcached':
                 key_prefix = app.config['PHPBB3_SESSION_BACKEND']['KEY_PREFIX']
-                self._cache = werkzeug.contrib.cache.MemcachedCache(
+                cache_driver = werkzeug.contrib.cache.MemcachedCache(
                     app.config['PHPBB3_SESSION_BACKEND']['SERVERS'],
                     key_prefix=key_prefix,
-                )
+                )  # type: werkzeug.contrib.cache.BaseCache
             else:
-                self._cache = werkzeug.contrib.cache.SimpleCache()
+                cache_driver = werkzeug.contrib.cache.SimpleCache()
         else:
-            self._cache = cache
+            cache_driver = cache
 
         # Setup teardown
         app.teardown_appcontext(self.teardown)
 
         # Add ourselves to the app, so session interface can function
         app.phpbb3 = self
+        app.phpbb3_cache = cache_driver
 
         # Use our session interface
         # TODO Is it wise to do it here? Should user do it himself?
         app.session_interface =\
-            flask_phpbb3.sessions.PhpBB3SessionInterface(app)
+            flask_phpbb3.sessions.PhpBB3SessionInterface()
 
     @classmethod
     def _ensure_default_config(cls, app):
@@ -105,7 +103,7 @@ class PhpBB3(object):
     def _backend(self):
         # type: () -> flask_phpbb3.backends.base.BaseBackend
         """Returns phpbb3 backend"""
-        current_app = flask.current_app
+        current_app = self.app or flask.current_app
 
         ctx = flask._app_ctx_stack.top
         if ctx is not None:
@@ -114,7 +112,7 @@ class PhpBB3(object):
                 backend = PhpBB3._create_backend(
                     current_app.config['PHPBB3']['DRIVER'],
                     current_app.config['PHPBB3_DATABASE'],
-                    self._cache,
+                    current_app.phpbb3_cache,
                 )
                 ctx.phpbb3_backend = backend
             else:
