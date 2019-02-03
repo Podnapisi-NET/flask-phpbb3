@@ -76,16 +76,20 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
                 return True
 
             # Access database
-            return bool(self._phpbb3().has_membership(
+            output = self._phpbb3().has_membership(
                 user_id=self['user_id'],
                 group_id=group
-            ))
+            )
         else:
             # Use group name
-            return bool(self._phpbb3().has_membership_resolve(
+            output = self._phpbb3().has_membership_resolve(
                 user_id=self['user_id'],
                 group_name=group
-            ))
+            )
+
+        if output is None:
+            return False
+        return output
 
     def _load_acl(self):
         # type: () -> None
