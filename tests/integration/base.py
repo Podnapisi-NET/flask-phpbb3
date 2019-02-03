@@ -18,11 +18,22 @@ DB_USER = 'phpbb3_test'
 DB_NAME = 'phpbb3_test'
 
 
+def setUpModule():
+    # type: () -> None
+    _create_db()
+    connection = _get_connection(DB_HOST, DB_USER, DB_NAME)
+    _init_schema(connection)
+    connection.commit()
+
+
+def tearDownModule():
+    # type: () -> None
+    _destory_db()
+
+
 class TestWithDatabase(unittest.TestCase):
     def setUp(self):
         # type: () -> None
-        _create_db()
-
         self.app = flask.Flask('test_app')
         self.app.config.update({
             'PHPBB3': {
@@ -76,7 +87,6 @@ class TestWithDatabase(unittest.TestCase):
 
         # Init connection
         self.connection = self.phpbb3._backend._db
-        _init_schema(self.connection)
         self.cursor = self.connection.cursor()\
             # type: psycopg2.extensions.cursor
 
@@ -87,10 +97,8 @@ class TestWithDatabase(unittest.TestCase):
         # type: () -> None
         self.connection.rollback()
         self.cursor.close()
-        self.connection.close()
 
         self.ctx.pop()
-        _destory_db()
 
 
 def _create_user(cursor):

@@ -2,6 +2,9 @@ from __future__ import absolute_import
 
 from . import base
 
+setUpModule = base.setUpModule
+tearDownModule = base.tearDownModule
+
 
 class TestGetUser(base.TestWithDatabase):
     def test_anonymous_user(self):
