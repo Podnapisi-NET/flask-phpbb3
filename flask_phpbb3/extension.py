@@ -207,5 +207,5 @@ class PhpBB3(object):
     def teardown(self, exception):
         # type: (typing.Any) -> None
         ctx = flask._app_ctx_stack.top
-        if hasattr(ctx, 'phphbb3_backend'):
+        if hasattr(ctx, 'phpbb3_backend'):
             ctx.phpbb3_backend.close()
