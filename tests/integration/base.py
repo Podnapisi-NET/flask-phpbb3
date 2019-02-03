@@ -9,6 +9,7 @@ import flask_phpbb3
 
 import psycopg2
 import psycopg2.extensions
+import psycopg2.extras
 
 
 DB_HOST = '127.0.0.1'
@@ -20,9 +21,7 @@ DB_NAME = 'phpbb3_test'
 class TestWithDatabase(unittest.TestCase):
     def setUp(self):
         # type: () -> None
-        self.connection = _create_db()
-        self.cursor = self.connection.cursor()\
-            # type: psycopg2.extensions.cursor
+        _create_db()
 
         self.app = flask.Flask('test_app')
         self.app.config.update({
@@ -74,19 +73,23 @@ class TestWithDatabase(unittest.TestCase):
 
         self.ctx = self.app.app_context()
         self.ctx.push()
-        # Inject connection
-        self.ctx.phpbb3_db = self.connection
+
+        # Init connection
+        self.connection = self.phpbb3._backend._db
+        _init_schema(self.connection)
+        self.cursor = self.connection.cursor()\
+            # type: psycopg2.extensions.cursor
 
         # Setup client
         self.client = self.app.test_client()
 
     def tearDown(self):
         # type: () -> None
-        self.ctx.pop()
         self.connection.rollback()
-
         self.cursor.close()
         self.connection.close()
+
+        self.ctx.pop()
         _destory_db()
 
 
@@ -94,8 +97,8 @@ def _create_user(cursor):
     # type: (psycopg2.extensions.cursor) -> None
     cursor.execute(
         "insert into"
-        " phpbb_users (username, username_clean)"
-        " values ('test', 'test')"
+        " phpbb_users (user_id, username, username_clean)"
+        " values (2, 'test', 'test')"
     )
 
 
@@ -111,12 +114,13 @@ def _create_session(cursor, session_id, user_id):
     )
 
 
-def _create_privilege(cursor, privilege):
-    # type: (psycopg2.extensions.cursor, str) -> None
+def _create_privilege(cursor, privilege_id, privilege):
+    # type: (psycopg2.extensions.cursor, int, str) -> None
     cursor.execute(
         "insert into"
-        " phpbb_acl_options (auth_option, is_global)"
-        " values (%(privilege)s, 1)", {
+        " phpbb_acl_options (auth_option_id, auth_option, is_global)"
+        " values (%(privilege_id)s, %(privilege)s, 1)", {
+            'privilege_id': privilege_id,
             'privilege': privilege,
         }
     )
@@ -138,7 +142,7 @@ def _grant_privilege(cursor, user_id):
 
 
 def _create_db():
-    # type: () -> psycopg2.extensions.connection
+    # type: () -> None
     connection = _get_connection(DB_HOST, DB_ROOT_USER, DB_ROOT_USER)
     connection.set_isolation_level(0)
 
@@ -152,13 +156,13 @@ def _create_db():
     cursor.close()
     connection.close()
 
+
+def _init_schema(connection):
+    # type: (psycopg2.extensions.connection) -> None
     schema_sql = open('./tests/fixtures/postgres/schema.sql', 'r').read()
-    connection = _get_connection(DB_HOST, DB_USER, DB_NAME)
     cursor_schema = connection.cursor()  # type: psycopg2.extensions.cursor
     cursor_schema.execute(schema_sql)
     cursor_schema.close()
-
-    return connection
 
 
 def _destory_db():
@@ -191,6 +195,5 @@ def _get_connection(host, user, database):
             db_host=host,
             user=user,
         ),
-        connection_factory=psycopg2.extras.DictConnection,
     )
     return connection

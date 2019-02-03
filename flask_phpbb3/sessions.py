@@ -7,6 +7,8 @@ import flask
 import flask.sessions
 import flask.wrappers
 
+import flask_phpbb3
+
 ANONYMOUS_CACHE_TTL = 3600 * 24
 ACL_OPTIONS_CACHE_TTL = 3600 * 1
 
@@ -41,6 +43,12 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
         super(PhpBB3Session, self).__delitem__(key)
         self.modified = True
 
+    @classmethod
+    def _phpbb3(cls):
+        # type: () -> flask_phpbb3.PhpBB3
+        output = flask.current_app.phpbb3  # type: flask_phpbb3.PhpBB3
+        return output
+
     def pop(self, *args, **kwargs):
         # type: (*typing.Any, **typing.Any) -> typing.Any
         """Wrapper to set modified."""
@@ -62,21 +70,19 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
     def is_member(self, group):
         # type: (typing.Union[int, str]) -> bool
         """Tests if user is a member of specified group."""
-        from flask import current_app
-
         if isinstance(group, int):
             # Try with default group
             if group == self['group_id']:
                 return True
 
             # Access database
-            return bool(current_app.phpbb3.has_membership(
+            return bool(self._phpbb3().has_membership(
                 user_id=self['user_id'],
                 group_id=group
             ))
         else:
             # Use group name
-            return bool(current_app.phpbb3.has_membership_resolve(
+            return bool(self._phpbb3().has_membership_resolve(
                 user_id=self['user_id'],
                 group_name=group
             ))
@@ -87,10 +93,8 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
             # Nothing to load/convert
             return
 
-        from flask import current_app
-
         # Fetch from cache
-        self._acl_options = current_app.phpbb3._cache.get('_acl_options')
+        self._acl_options = self._phpbb3()._cache.get('_acl_options')
 
         if not self._acl_options:
             # Load ACL options, so we can decode the user ACL
@@ -101,10 +105,12 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
             local_index = 0
             global_index = 0
 
-            for opt in current_app.phpbb3.cached_fetch_acl_options(
+            results = self._phpbb3().fetch_acl_options(
+                cache=True,
                 cache_ttl=ACL_OPTIONS_CACHE_TTL,
-                limit=None
-            ):
+                limit=None,
+            )
+            for opt in results or []:
                 if opt['is_local'] == 1:
                     self._acl_options['local'][opt['auth_option']] =\
                         local_index
@@ -117,7 +123,7 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
                 # option <=> id
 
             # Store it into cache
-            current_app.phpbb3._cache.set('_acl_options', self._acl_options)
+            self._phpbb3()._cache.set('_acl_options', self._acl_options)
 
         if not self._acl:
             # Load/transform user's ACL data
@@ -212,13 +218,20 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
     def num_unread_notifications(self):
         # type: () -> int
         """Returns number of unread notifications."""
-        from flask import current_app
         if 'num_unread_notifications' not in self._request_cache:
-            self._request_cache['num_unread_notifications'] =\
-                current_app.phpbb3.get_unread_notifications_count(
-                    user_id=self['user_id']
-                )['num']
-        return int(self._request_cache['num_unread_notifications'])
+            result = self._phpbb3().get_unread_notifications_count(
+                user_id=self['user_id']
+            )
+            if result:
+                unread_count = int(result['num'])
+            else:
+                unread_count = 0
+
+            self._request_cache['num_unread_notifications'] = unread_count
+        else:
+            unread_count = self._request_cache['num_unread_notifications']
+
+        return unread_count
 
 
 class PhpBB3SessionInterface(flask.sessions.SessionInterface):
@@ -236,6 +249,10 @@ class PhpBB3SessionInterface(flask.sessions.SessionInterface):
         # type: (flask.Flask, flask.wrappers.Request) -> PhpBB3Session
         cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
 
+        if not hasattr(app, 'phpbb3'):
+            raise ValueError('App not properly configured, phpbb3 is missing!')
+        phpbb3 = app.phpbb3  # type: flask_phpbb3.PhpBB3
+
         session_id = request.args.get('sid', type=str)\
             or request.cookies.get(cookie_name + 'sid', None)
         if not session_id:
@@ -244,13 +261,14 @@ class PhpBB3SessionInterface(flask.sessions.SessionInterface):
         user = None
         if session_id:
             # Try to fetch session
-            user = app.phpbb3.get_session(session_id=session_id)
+            user = phpbb3.get_session(session_id=session_id)
             if user and 'username' in user:
                 user['username'] = user['username'].decode('utf-8', 'ignore')
         if not user:
             # Use anonymous user
-            user = app.phpbb3.cached_get_user(
+            user = phpbb3.get_user(
                 user_id=1,
+                cache=True,
                 cache_ttl=ANONYMOUS_CACHE_TTL
             )
 

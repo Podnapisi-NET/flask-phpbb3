@@ -27,9 +27,9 @@ class TestGetUser(base.TestWithDatabase):
 class TestFetch(base.TestWithDatabase):
     def test_paging(self):
         # type: () -> None
-        base._create_privilege(self.cursor, 'm_edit')
-        base._create_privilege(self.cursor, 'm_delete')
-        base._create_privilege(self.cursor, 'm_some_random')
+        base._create_privilege(self.cursor, 1, 'm_edit')
+        base._create_privilege(self.cursor, 2, 'm_delete')
+        base._create_privilege(self.cursor, 3, 'm_some_random')
 
         expected_privileges = [(0, [{
             'auth_option': 'm_edit',
@@ -110,7 +110,7 @@ class TestSession(base.TestWithDatabase):
         # type: () -> None
         base._create_user(self.cursor)
         base._create_session(self.cursor, self.session_id, 2)
-        base._create_privilege(self.cursor, 'm_edit')
+        base._create_privilege(self.cursor, 1, 'm_edit')
         base._grant_privilege(self.cursor, 2)
 
         data = self.client.get('/priv_test').data

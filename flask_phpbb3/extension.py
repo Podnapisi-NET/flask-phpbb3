@@ -1,44 +1,22 @@
 from __future__ import absolute_import
 
-import functools
-import json
 import typing
 
 import flask
-from flask import _app_ctx_stack as flask_stack
 
+import flask_phpbb3.backends.base
 import flask_phpbb3.sessions
 
 import werkzeug.contrib.cache
 
-try:
-    import psycopg2
-    import psycopg2.extras
-except ImportError:
-    from psycopg2cffi import compat
-    compat.register()
-    import psycopg2.extras
-
 
 class PhpBB3(object):
-    KNOWN_OPERATIONS = (
-        'fetch',
-        'get',
-        'has',
-        'set',
-    )
-    KNOWN_DRIVERS = (
-        'psycopg2',
-    )
-
     def __init__(
         self,
         app=None,  # type: typing.Optional[flask.Flask]
         cache=None,  # type: werkzeug.contrib.cache.BaseCache
     ):
         # type: (...) -> None
-        self._functions = {}  # type: dict
-
         self._cache = werkzeug.contrib.cache.SimpleCache()\
             # type: werkzeug.contrib.cache.BaseCache
 
@@ -96,9 +74,6 @@ class PhpBB3(object):
         else:
             self._cache = cache
 
-        # Setup available SQL functions
-        self._prepare_statements()
-
         # Setup teardown
         app.teardown_appcontext(self.teardown)
 
@@ -110,191 +85,128 @@ class PhpBB3(object):
         app.session_interface =\
             flask_phpbb3.sessions.PhpBB3SessionInterface(app)
 
-    @property
-    def _db(self):
-        # type: () -> typing.Any
-        """Returns database connection."""
-        ctx = flask_stack.top
-        if ctx is not None:
-            # Connect when there is no connection or we have a closed
-            # connection
-            if not hasattr(ctx, 'phpbb3_db') or ctx.phpbb3_db.closed:
-                ctx.phpbb3_db = psycopg2.connect(
-                    'dbname={DATABASE}'
-                    ' host={HOST}'
-                    ' user={USER}'
-                    ' password={PASSWORD}'.format(**self._config['db']),
-                    connection_factory=psycopg2.extras.DictConnection
-                )
-            return ctx.phpbb3_db
-
-    def _prepare_statements(self):
-        # type: () -> None
-        """
-        Initializes prepared SQL statements, depending on version of PHPBB3
-        """
-        self._functions.update(dict(
-            get_autologin=(
-                "SELECT u.* "
-                "FROM {TABLE_PREFIX}users u,"
-                "     {TABLE_PREFIX}sessions_keys k "
-                # FIXME Make it prettier, USER_NORMAL and USER_FOUNDER
-                "WHERE u.user_type IN (0, 3)"
-                "AND k.user_id=u.user_id"
-                "AND k.key_id = %(key)s"
-            ),
-            get_session=(
-                "SELECT * "
-                "FROM {TABLE_PREFIX}sessions s, {TABLE_PREFIX}users u "
-                "WHERE s.session_id = %(session_id)s "
-                "AND s.session_user_id=u.user_id"
-            ),
-            get_user=(
-                "SELECT * "
-                "FROM {TABLE_PREFIX}users "
-                "WHERE user_id = %(user_id)s"),
-            has_membership=(
-                "SELECT ug.group_id "
-                "FROM {TABLE_PREFIX}user_group ug "
-                "WHERE ug.user_id = %(user_id)s "
-                "  AND ug.group_id = %(group_id)s "
-                "  AND ug.user_pending=0 "
-                "LIMIT 1"
-            ),
-            has_membership_resolve=(
-                "SELECT ug.group_id "
-                "FROM {TABLE_PREFIX}user_group ug,"
-                "     {TABLE_PREFIX}groups g "
-                "WHERE ug.user_id = %(user_id)s "
-                "  AND g.group_name = %(group_name)s "
-                "  AND ug.group_id=g.group_id "
-                "  AND ug.user_pending=0 "
-                "LIMIT 1"
-            ),
-            fetch_acl_options=(
-                "SELECT"
-                "   *"
-                " FROM"
-                "   {TABLE_PREFIX}acl_options"
-                " ORDER BY"
-                "   auth_option_id"
-            ),
-            get_unread_notifications_count=(
-                "SELECT"
-                "   COUNT(n.*) as num"
-                " FROM"
-                "   {TABLE_PREFIX}notifications n,"
-                "   {TABLE_PREFIX}notification_types nt"
-                " WHERE"
-                "   n.user_id = %(user_id)s "
-                "   AND nt.notification_type_id=n.notification_type_id"
-                "   AND nt.notification_type_enabled=1 "
-                "   AND n.notification_read=0"
-            ),
-        ))
-
-        # TODO Add/Move to version specific queries
-
-    def _sql_query(
-        self,
-        operation,  # type: str
-        query,  # type: str
-        cache_key=None,  # type: typing.Optional[str]
-        cache_ttl=None,  # type: typing.Optional[int]
-        skip=0,  # type: int
-        limit=10,  # type: typing.Optional[int]
-        **kwargs  # type: int
+    @classmethod
+    def _create_backend(
+        cls,
+        backend_type,  # type: str
+        config,  # type: dict
+        cache  # type: werkzeug.contrib.cache.BaseCache
     ):
-        # type: (...) -> typing.Any
-        """Executes a query with values in kwargs."""
-        if operation not in self.KNOWN_OPERATIONS:
-            raise ValueError("Unknown operation")
-
-        versioned_cache_key = None
-        if cache_key and operation != 'set':
-            versioned_cache_key = '{name}:{arguments}'.format(
-                name=cache_key,
-                arguments=':'.join(key + str(value)
-                                   for key, value in kwargs.items())
+        # type: (...) -> flask_phpbb3.backends.base.BaseBackend
+        if backend_type == 'psycopg2':
+            import flask_phpbb3.backends.psycopg2
+            return flask_phpbb3.backends.psycopg2.Psycopg2Backend(
+                cache,
+                config,
             )
-            raw_data = self._cache.get(versioned_cache_key)
-            if raw_data and isinstance(raw_data, (str, unicode)):
-                try:
-                    return json.loads(raw_data)
-                except ValueError:
-                    # Woops :S
-                    pass
+        else:
+            raise ValueError('Unsupported driver {}'.format(backend_type))
 
-        # FIXME Driver specific code!
-        c = self._db.cursor()
+    @property
+    def _backend(self):
+        # type: () -> flask_phpbb3.backends.base.BaseBackend
+        """Returns phpbb3 backend"""
+        ctx = flask._app_ctx_stack.top
+        if ctx is not None:
+            if not hasattr(ctx, 'phpbb3_backend')\
+               or ctx.phpbb3_backend.is_closed:
+                backend = PhpBB3._create_backend(
+                    self._config['general']['DRIVER'],
+                    self._config['db'],
+                    self._cache,
+                )
+                ctx.phpbb3_backend = backend
+            else:
+                backend = ctx.phpbb3_backend
+            return backend
+        raise AttributeError('No context available')
 
-        if operation == 'fetch':
-            # Add skip and limit
-            query += ' OFFSET {:d}'.format(skip)
-            if limit:
-                query += 'LIMIT {:d}'.format(limit)
-
-        c.execute(query.format(**self._config['db']), kwargs)
-
-        output = None
-        if operation == 'get':
-            output = c.fetchone()
-            if output is not None:
-                output = dict(output)
-        elif operation == 'has':
-            output = bool(c.fetchone())
-        elif operation == 'fetch':
-            # FIXME a more performant option
-            output = [dict(i) for i in c]
-        elif operation == 'set':
-            # It is an update
-            output = c.statusmessage
-            self._db.commit()
-        c.close()
-
-        if versioned_cache_key:
-            try:
-                self._cache.set(versioned_cache_key,
-                                json.dumps(output),
-                                cache_ttl)
-            except ValueError:
-                # Woops :S
-                pass
-
+    def get_autologin(self, key, cache=False, cache_ttl=None):
+        # type: (str, bool, typing.Optional[int]) -> typing.Optional[dict]
+        output = self._backend.execute('get_autologin', key=key)\
+            # type: typing.Optional[dict]
         return output
 
-    def __getattr__(self, name):
-        # type: (str) -> typing.Callable
-        parsed_name = name.split('_')
-        is_cached = False
-        if parsed_name[0] == 'cached':
-            is_cached = True
-            parsed_name = parsed_name[1:]
+    def get_session(self, session_id, cache=False, cache_ttl=None):
+        # type: (str, bool, typing.Optional[int]) -> typing.Optional[dict]
+        output = self._backend.execute('get_session', session_id=session_id)\
+            # type: typing.Optional[dict]
+        return output
 
-        operation = parsed_name[0]
-        prepared_statement = '_'.join(parsed_name)
-        cache_key = None
-        if is_cached:
-            cache_key = prepared_statement
+    def get_user(self, user_id, cache=False, cache_ttl=None):
+        # type: (int, bool, typing.Optional[int]) -> typing.Optional[dict]
+        output = self._backend.execute('get_user', user_id=user_id)\
+            # type: typing.Optional[dict]
+        return output
 
-        if prepared_statement not in self._functions:
-            raise AttributeError("Function {} does not exist.".format(
-                prepared_statement
-            ))
+    def has_membership(
+        self,
+        user_id,  # type: int
+        group_id,  # type: int
+        cache=False,  # type: bool
+        cache_ttl=None,  # type: typing.Optional[int]
+    ):
+        # type: (...) -> typing.Optional[bool]
+        output = self._backend.execute(
+            'has_membership',
+            user_id=user_id,
+            group_id=group_id,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[bool]
+        return output
 
-        func_or_query = self._functions[prepared_statement]
-        if callable(func_or_query):
-            return functools.partial(func_or_query, self)
-        else:
-            return functools.partial(
-                self._sql_query,
-                operation,
-                func_or_query,
-                cache_key,
-            )
+    def has_membership_resolve(
+        self,
+        user_id,  # type: int
+        group_name,  # type: str
+        cache=False,  # type: bool
+        cache_ttl=None,  # type: typing.Optional[int]
+    ):
+        # type: (...) -> typing.Optional[bool]
+        output = self._backend.execute(
+            'has_membership_resolve',
+            user_id=user_id,
+            group_name=group_name,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[bool]
+        return output
+
+    def fetch_acl_options(
+        self,
+        skip=0,  # type: int
+        limit=10,  # type: typing.Optional[int]
+        cache=False,  # type: bool
+        cache_ttl=None,  # type: typing.Optional[int]
+    ):
+        # type: (...) -> typing.Optional[typing.List[dict]]
+        output = self._backend.execute(
+            'fetch_acl_options',
+            skip=skip,
+            limit=limit,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[typing.List[dict]]
+        return output
+
+    def get_unread_notifications_count(
+        self,
+        user_id,  # type: int
+        cache=False,  # type: bool
+        cache_ttl=None,  # type: typing.Optional[int]
+    ):
+        # type: (...) -> typing.Optional[dict]
+        output = self._backend.execute(
+            'get_unread_notifications_count',
+            user_id=user_id,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[dict]
+        return output
 
     def teardown(self, exception):
         # type: (typing.Any) -> None
-        ctx = flask_stack.top
-        if hasattr(ctx, 'phphbb3_db'):
-            ctx.phpbb3_db.close()
+        ctx = flask._app_ctx_stack.top
+        if hasattr(ctx, 'phphbb3_backend'):
+            ctx.phpbb3_backend.close()
