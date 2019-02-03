@@ -1,9 +1,20 @@
 from __future__ import absolute_import
 
+import mock
+
 from . import base
 
 setUpModule = base.setUpModule
 tearDownModule = base.tearDownModule
+
+
+class TestExtension(base.TestWithDatabase):
+    @mock.patch('flask_phpbb3.backends.psycopg2.Psycopg2Backend.close')
+    def test_teardown(self, mocked_close):
+        # type: (mock.Mock) -> None
+        self.ctx.pop()
+        mocked_close.assert_called()
+        self.ctx.push()
 
 
 class TestGetUser(base.TestWithDatabase):
