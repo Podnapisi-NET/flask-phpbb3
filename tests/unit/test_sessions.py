@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import hashlib
 import unittest
 
-import flask_phpbb3
+import flask_phpbb3.sessions
 
 import mock
 
@@ -11,7 +11,7 @@ import mock
 class TestSession(unittest.TestCase):
     def setUp(self):
         # type: () -> None
-        self.session = flask_phpbb3.PhpBB3Session()
+        self.session = flask_phpbb3.sessions.PhpBB3Session()
 
 
 class TestSessionMutability(TestSession):
@@ -75,7 +75,7 @@ class TestSessionMutability(TestSession):
 
 
 class TestSessionHasPrivileges(TestSession):
-    @mock.patch('flask_phpbb3.PhpBB3Session.has_privilege')
+    @mock.patch('flask_phpbb3.sessions.PhpBB3Session.has_privilege')
     def test_combinations(self, has_privilege_mock):
         # type: (mock.Mock) -> None
         privileges = ('m_edit', 'm_delete', 'm_view')
@@ -96,7 +96,8 @@ class TestSessionHasPrivileges(TestSession):
         actual_result = self.session.has_privileges(*privileges)
         self.assertTrue(actual_result)
 
-    @mock.patch('flask_phpbb3.PhpBB3Session.has_privilege', return_value=False)
+    @mock.patch('flask_phpbb3.sessions.PhpBB3Session.has_privilege',
+                return_value=False)
     def test_per_forum(self, has_privilege_mock):
         # type: (mock.Mock) -> None
         privileges = ('m_edit', 'm_delete', 'm_view')
@@ -117,7 +118,7 @@ class TestSessionHasPrivileges(TestSession):
         ], any_order=True)
 
 
-@mock.patch('flask_phpbb3.PhpBB3Session._load_acl')
+@mock.patch('flask_phpbb3.sessions.PhpBB3Session._load_acl')
 class TestSessionHasPrivilege(TestSession):
     def setUp(self):
         # type: () -> None
