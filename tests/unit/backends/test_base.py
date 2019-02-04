@@ -4,6 +4,8 @@ import unittest
 
 import flask_phpbb3.backends.base
 
+import mock
+
 
 class TestSessionHasPrivilege(unittest.TestCase):
     def setUp(self):
@@ -148,3 +150,54 @@ class TestSessionHasPrivilege(unittest.TestCase):
             forum_id=2
         )
         self.assertFalse(actual_result)
+
+
+class TestSessionHasPrivileges(unittest.TestCase):
+    def setUp(self):
+        # type: () -> None
+        self.user_acl = flask_phpbb3.backends.base.UserAcl(
+            raw_acl_options=[],
+            raw_user_permissions='',
+        )
+
+    @mock.patch('flask_phpbb3.backends.base.UserAcl.has_privilege')
+    def test_combinations(self, has_privilege_mock):
+        # type: (mock.Mock) -> None
+        privileges = ('m_edit', 'm_delete', 'm_view')
+        has_privilege_mock.return_value = False
+
+        actual_result = self.user_acl.has_privileges(*privileges)
+        self.assertFalse(actual_result)
+
+        has_privilege_mock.side_effect = [False, False, True]
+        actual_result = self.user_acl.has_privileges(*privileges)
+        self.assertTrue(actual_result)
+
+        has_privilege_mock.side_effect = [True, False, False]
+        actual_result = self.user_acl.has_privileges(*privileges)
+        self.assertTrue(actual_result)
+
+        has_privilege_mock.side_effect = [True, True, True]
+        actual_result = self.user_acl.has_privileges(*privileges)
+        self.assertTrue(actual_result)
+
+    @mock.patch('flask_phpbb3.backends.base.UserAcl.has_privilege',
+                return_value=False)
+    def test_per_forum(self, has_privilege_mock):
+        # type: (mock.Mock) -> None
+        privileges = ('m_edit', 'm_delete', 'm_view')
+
+        self.user_acl.has_privileges(*privileges)
+        has_privilege_mock.assert_has_calls([
+            mock.call('m_edit', forum_id=0),
+            mock.call('m_delete', forum_id=0),
+            mock.call('m_view', forum_id=0),
+        ], any_order=True)
+
+        has_privilege_mock.reset_mock()
+        self.user_acl.has_privileges(*privileges, forum_id=2)
+        has_privilege_mock.assert_has_calls([
+            mock.call('m_edit', forum_id=2),
+            mock.call('m_delete', forum_id=2),
+            mock.call('m_view', forum_id=2),
+        ], any_order=True)

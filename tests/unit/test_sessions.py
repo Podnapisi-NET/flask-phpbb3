@@ -5,8 +5,6 @@ import unittest
 
 import flask_phpbb3.sessions
 
-import mock
-
 
 class TestSession(unittest.TestCase):
     def setUp(self):
@@ -72,50 +70,6 @@ class TestSessionMutability(TestSession):
 
         self.session.clear()
         self.assertTrue(self.session.modified)
-
-
-class TestSessionHasPrivileges(TestSession):
-    @mock.patch('flask_phpbb3.sessions.PhpBB3Session.has_privilege')
-    def test_combinations(self, has_privilege_mock):
-        # type: (mock.Mock) -> None
-        privileges = ('m_edit', 'm_delete', 'm_view')
-        has_privilege_mock.return_value = False
-
-        actual_result = self.session.has_privileges(*privileges)
-        self.assertFalse(actual_result)
-
-        has_privilege_mock.side_effect = [False, False, True]
-        actual_result = self.session.has_privileges(*privileges)
-        self.assertTrue(actual_result)
-
-        has_privilege_mock.side_effect = [True, False, False]
-        actual_result = self.session.has_privileges(*privileges)
-        self.assertTrue(actual_result)
-
-        has_privilege_mock.side_effect = [True, True, True]
-        actual_result = self.session.has_privileges(*privileges)
-        self.assertTrue(actual_result)
-
-    @mock.patch('flask_phpbb3.sessions.PhpBB3Session.has_privilege',
-                return_value=False)
-    def test_per_forum(self, has_privilege_mock):
-        # type: (mock.Mock) -> None
-        privileges = ('m_edit', 'm_delete', 'm_view')
-
-        self.session.has_privileges(*privileges)
-        has_privilege_mock.assert_has_calls([
-            mock.call('m_edit'),
-            mock.call('m_delete'),
-            mock.call('m_view'),
-        ], any_order=True)
-
-        has_privilege_mock.reset_mock()
-        self.session.has_privileges(*privileges, forum_id=2)
-        has_privilege_mock.assert_has_calls([
-            mock.call('m_edit', forum_id=2),
-            mock.call('m_delete', forum_id=2),
-            mock.call('m_view', forum_id=2),
-        ], any_order=True)
 
 
 class TestSessionUser(TestSession):

@@ -175,3 +175,12 @@ class UserAcl(object):
             negated ^ self._acl_lookup_cache[str_forum_id][option]
         )  # type: bool
         return output
+
+    def has_privileges(self, *privileges, **kwargs):
+        # type: (*str, **int) -> bool
+        forum_id = kwargs.get('forum_id', 0)
+
+        output = False
+        for option in privileges:
+            output |= self.has_privilege(option, forum_id=forum_id)
+        return output

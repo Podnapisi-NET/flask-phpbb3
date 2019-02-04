@@ -108,11 +108,12 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
         return self._acl.has_privilege(option, forum_id)
 
     def has_privileges(self, *options, **kwargs):
-        # type: (*str, **typing.Any) -> bool
-        output = False
-        for option in options:
-            output |= self.has_privilege(option, **kwargs)
-        return output
+        # type: (*str, **int) -> bool
+        forum_id = kwargs.get('forum_id', 0)
+
+        if not self._acl:
+            self._acl = self._phpbb3.get_user_acl(self['user_permissions'])
+        return self._acl.has_privileges(*options, forum_id=forum_id)
 
     def get_link_hash(self, link):
         # type: (str) -> str
