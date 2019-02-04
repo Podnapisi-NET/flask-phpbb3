@@ -8,6 +8,7 @@ import flask.sessions
 import flask.wrappers
 
 import flask_phpbb3
+import flask_phpbb3.backends.base
 
 import werkzeug.contrib.cache
 
@@ -23,9 +24,8 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
         self._read_only_properties = set([])  # type: set
 
         # Some ACL related things
-        self._acl_options = None  # type: typing.Optional[dict]
-        self._acl = None  # type: typing.Optional[dict]
-        self._acl_cache = {}  # type: typing.Dict[str, typing.Dict[str, bool]]
+        self._acl = None\
+            # type: typing.Optional[flask_phpbb3.backends.base.UserAcl]
 
         # Per request cache
         # This should not be cached into session, but per
@@ -99,26 +99,13 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
             return False
         return output
 
-    def _load_acl(self):
-        # type: () -> None
-        if self._acl_options is None:
-            self._acl_options = self._phpbb3._backend.fetch_acl()
-        if self._acl is None:
-            self._acl =\
-                self._phpbb3._backend.parse_user_acl(self['user_permissions'])
-
     def has_privilege(self, option, forum_id=0):
         # type: (str, int) -> bool
         """Test if user has global or local (if forum_id is set) privileges."""
-        # We load the ACL
-        self._load_acl()
+        if not self._acl:
+            self._acl = self._phpbb3.get_user_acl(self['user_permissions'])
 
-        return self._phpbb3._backend.has_user_privilege(
-            self._acl or {},
-            self._acl_options or {},
-            option,
-            forum_id
-        )
+        return self._acl.has_privilege(option, forum_id)
 
     def has_privileges(self, *options, **kwargs):
         # type: (*str, **typing.Any) -> bool

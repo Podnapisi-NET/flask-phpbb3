@@ -204,6 +204,10 @@ class PhpBB3(object):
         )  # type: typing.Optional[dict]
         return output
 
+    def get_user_acl(self, raw_user_permissions):
+        # type: (str) -> flask_phpbb3.backends.base.UserAcl
+        return self._backend.get_user_acl(raw_user_permissions)
+
     def teardown(self, exception):
         # type: (typing.Any) -> None
         ctx = flask._app_ctx_stack.top

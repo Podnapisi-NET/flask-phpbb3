@@ -63,56 +63,65 @@ class BaseBackend(object):
         # type: () -> bool
         raise NotImplementedError
 
-    def fetch_acl(self):
-        # type: () -> dict
-        acl_options = self._cache.get('_acl_options')  # type: dict
+    def get_user_acl(self, raw_user_permissions):
+        # type: (str) -> UserAcl
+        raw_acl_options = self.execute(
+            'fetch_acl_options',
+            cache=True,
+            cache_ttl=ACL_OPTIONS_CACHE_TTL,
+            limit=None,
+        )
 
-        if not acl_options:
-            # Load ACL options, so we can decode the user ACL
-            acl_options = {
-                'local': {},
-                'global': {}
-            }
-            local_index = 0
-            global_index = 0
+        return UserAcl(raw_acl_options, raw_user_permissions)
 
-            results = self.execute(
-                'fetch_acl_options',
-                cache=True,
-                cache_ttl=ACL_OPTIONS_CACHE_TTL,
-                limit=None,
-            )
-            for opt in results or []:
-                if opt['is_local'] == 1:
-                    acl_options['local'][opt['auth_option']] =\
-                        local_index
-                    local_index += 1
-                if opt['is_global'] == 1:
-                    acl_options['global'][opt['auth_option']] =\
-                        global_index
-                    global_index += 1
-                # TODO By looking phpbb3 code, here also comes translation
-                # option <=> id
 
-            # Store it into cache
-            self._cache.set('_acl_options', acl_options)
+class UserAcl(object):
+    def __init__(self, raw_acl_options, raw_user_permissions):
+        # type: (typing.List[dict], str) -> None
+        self._acl_options = self._parse_acl_options(raw_acl_options)
+        self._acl = self._parse_user_permissions(raw_user_permissions)
+        self._acl_lookup_cache = {}  # type: dict
+
+    @classmethod
+    def _parse_acl_options(cls, raw_acl_options):
+        # type: (typing.List[dict]) -> dict
+        # Load ACL options, so we can decode the user ACL
+        acl_options = {
+            'local': {},
+            'global': {}
+        }  # type: dict
+        local_index = 0
+        global_index = 0
+
+        for opt in raw_acl_options or []:
+            if opt['is_local'] == 1:
+                acl_options['local'][opt['auth_option']] =\
+                    local_index
+                local_index += 1
+            if opt['is_global'] == 1:
+                acl_options['global'][opt['auth_option']] =\
+                    global_index
+                global_index += 1
+            # TODO By looking phpbb3 code, here also comes translation
+            # option <=> id
 
         return acl_options
 
-    def parse_user_acl(self, user_permissions):
-        # type: (str) -> typing.Dict[str, str]
+    @classmethod
+    def _parse_user_permissions(cls, raw_user_permissions):
+        # type: (str) -> dict
         seq_cache = {}  # type: dict
-        user_acl = {}
+        acl = {}
 
-        split_user_permissions = user_permissions\
+        split_user_permissions = raw_user_permissions\
             .rstrip()\
             .splitlines()
-        for f, perms in enumerate(split_user_permissions):
+        for forum_id, perms in enumerate(split_user_permissions):
             if not perms:
                 continue
 
             # Do the conversion magic
-            user_acl[str(f)] = ''
+            acl[str(forum_id)] = ''
             for sub in [perms[j:j + 6] for j in range(0, len(perms), 6)]:
                 if sub in seq_cache:
                     converted = seq_cache[sub]
@@ -122,13 +131,12 @@ class BaseBackend(object):
                                                  * (31 - len(converted))\
                                                  + converted
 
-                user_acl[str(f)] += converted
+                acl[str(forum_id)] += converted
 
-        return user_acl
+        return acl
 
-    @classmethod
-    def has_user_privilege(self, user_acl, acl_options, privilege, forum_id=0):
-        # type: (dict, dict, str, int) -> bool
+    def has_privilege(self, privilege, forum_id=0):
+        # type: (str, int) -> bool
         # Parse negation
         str_forum_id = str(forum_id)
 
@@ -138,35 +146,32 @@ class BaseBackend(object):
         else:
             option = privilege
 
-        acl_cache = {}  # type: dict
-        acl_cache.setdefault(str_forum_id, {})[option] = False
+        self._acl_lookup_cache.setdefault(str_forum_id, {})[option] = False
 
         # Global permissions
-        if acl_options\
-           and isinstance(user_acl, dict)\
-           and option in acl_options['global']\
-           and '0' in user_acl:
+        if option in self._acl_options['global']\
+           and '0' in self._acl:
             try:
-                acl_option = acl_options['global'][option]
-                permission = user_acl['0'][acl_option]
-                acl_cache[str_forum_id][option] =\
+                acl_option = self._acl_options['global'][option]
+                permission = self._acl['0'][acl_option]
+                self._acl_lookup_cache[str_forum_id][option] =\
                     bool(int(permission))
             except IndexError:
                 pass
 
         # Local permissions
         if str_forum_id != '0'\
-           and acl_options\
-           and user_acl\
-           and option in acl_options['local']:
+           and option in self._acl_options['local']:
             try:
-                acl_option = acl_options['local'][option]
+                acl_option = self._acl_options['local'][option]
                 permission =\
-                    user_acl.get(str_forum_id, '0' * 31)[acl_option]
-                acl_cache[str_forum_id][option] |=\
+                    self._acl.get(str_forum_id, '0' * 31)[acl_option]
+                self._acl_lookup_cache[str_forum_id][option] |=\
                     bool(int(permission))
             except IndexError:
                 pass
 
-        output = negated ^ acl_cache[str_forum_id][option]  # type: bool
+        output = (
+            negated ^ self._acl_lookup_cache[str_forum_id][option]
+        )  # type: bool
         return output
