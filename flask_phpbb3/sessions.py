@@ -50,13 +50,6 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
         output = flask.current_app.phpbb3  # type: flask_phpbb3.PhpBB3
         return output
 
-    @property
-    def _cache(self):
-        # type: () -> werkzeug.contrib.cache.BaseCache
-        output = flask.current_app.phpbb3_cache\
-            # type: werkzeug.contrib.cache.BaseCache
-        return output
-
     def pop(self, *args, **kwargs):
         # type: (*typing.Any, **typing.Any) -> typing.Any
         """Wrapper to set modified."""
