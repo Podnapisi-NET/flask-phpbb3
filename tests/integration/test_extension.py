@@ -120,6 +120,16 @@ class TestSession(base.TestWithDatabase):
         data = self.client.get('/data').data
         self.assertEqual(data, 'something')
 
+    def test_storage_invalid_id(self):
+        # type: () -> None
+        data = self.client.get('/data').data
+        self.assertEqual(data, '')
+
+        self.client.get('/data/something')
+
+        data = self.client.get('/data').data
+        self.assertEqual(data, '')
+
     def test_privilege(self):
         # type: () -> None
         base._create_user(self.cursor)
