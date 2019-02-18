@@ -1,6 +1,6 @@
 -- A poor man's phpbb3 copy
 create table phpbb_users (
-    user_id serial primary key,
+    user_id integer primary key,
     user_type smallint not null default 0,
     group_id integer not null default 3,
     user_permissions text not null default '',
@@ -69,10 +69,12 @@ create table phpbb_users (
 );
 
 insert into phpbb_users (
-    username
+    user_id
+    ,username
     , username_clean
 ) values (
-    'Anonymous'
+    1
+    ,'Anonymous'
     , 'anonymous'
 );
 
@@ -107,7 +109,7 @@ create table phpbb_user_group (
 );
 
 create table phpbb_groups (
-    group_id  serial  primary key,
+    group_id  integer  primary key,
     group_type  smallint  not null default (1)::smallint,
     group_founder_manage  smallint  not null default (0)::smallint,
     group_skip_auth  smallint  not null default (0)::smallint,
@@ -131,7 +133,7 @@ create table phpbb_groups (
 );
 
 create table phpbb_acl_options (
-    auth_option_id  serial  primary key,
+    auth_option_id  integer  primary key,
     auth_option  character varying(50)  not null default ''::character varying,
     is_global  smallint  not null default (0)::smallint,
     is_local  smallint  not null default (0)::smallint,
@@ -139,7 +141,7 @@ create table phpbb_acl_options (
 );
 
 create table phpbb_notifications (
-    notification_id  serial  primary key,
+    notification_id  integer  primary key,
     notification_type_id  smallint  not null default (0)::smallint,
     item_id  integer  not null default 0,
     item_parent_id  integer  not null default 0,
