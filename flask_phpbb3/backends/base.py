@@ -25,11 +25,11 @@ class BaseBackend(object):
     ):
         # type: (...) -> None
         self._functions = {}  # type: typing.Dict[str, str]
+        self._connection = None
         self._cache = cache
         self._config = config
 
         self._prepare_statements()
-        self._setup_connection()
 
     def _setup_connection(self):
         # type: () -> None

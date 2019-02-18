@@ -29,7 +29,7 @@ class Psycopg2Backend(base.BaseBackend):
     def _db(self):
         # type: () -> psycopg2.extensions.connection
         if not self._connection:
-            raise NotImplementedError
+            self._setup_connection()
 
         return self._connection
 
@@ -130,36 +130,10 @@ class Psycopg2Backend(base.BaseBackend):
                     # Woops :S
                     pass
 
-        # FIXME Driver specific code!
-        c = self._db.cursor()
-
         if operation == 'fetch':
-            # Add skip and limit
-            query += ' OFFSET {:d}'.format(skip)
-            if limit:
-                query += 'LIMIT {:d}'.format(limit)
+            query = self._paginate_query(query, skip, limit)
 
-        c.execute(
-            query.format(TABLE_PREFIX=self._config['TABLE_PREFIX']),
-            kwargs
-        )
-
-        if operation == 'get':
-            output = c.fetchone()
-            if output is not None:
-                output = dict(output)
-        elif operation == 'has':
-            output = bool(c.fetchone())
-        elif operation == 'fetch':
-            # FIXME a more performant option
-            output = [dict(i) for i in c]
-        elif operation == 'set':
-            # It is an update
-            output = c.statusmessage
-            self._db.commit()
-        else:
-            raise ValueError('Unknown operation {}'.format(operation))
-        c.close()
+        output = self._execute_operation(operation, query, kwargs)
 
         if cache_key:
             try:
@@ -169,6 +143,45 @@ class Psycopg2Backend(base.BaseBackend):
             except ValueError:
                 # Woops :S
                 pass
+
+        return output
+
+    def _paginate_query(self, query, skip, limit):
+        # type: (str, int, typing.Optional[int]) -> str
+        output = query + ' OFFSET {:d}'.format(skip)
+        if limit:
+            output += ' LIMIT {:d}'.format(limit)
+        return output
+
+    def _execute_operation(
+        self,
+        operation,  # type: str
+        query,  # type: str
+        params  # type: typing.Dict[str, typing.Union[str, int]]
+    ):
+        # type: (...) -> typing.Any
+        cursor = self._db.cursor()
+
+        cursor.execute(
+            query.format(TABLE_PREFIX=self._config['TABLE_PREFIX']),
+            params
+        )
+
+        if operation == 'get':
+            output = cursor.fetchone()
+            if output is not None:
+                output = dict(output)
+        elif operation == 'has':
+            output = bool(cursor.fetchone())
+        elif operation == 'fetch':
+            output = [dict(i) for i in cursor]
+        elif operation == 'set':
+            # It is an update
+            output = cursor.statusmessage
+            self._db.commit()
+        else:
+            output = None
+        cursor.close()
 
         return output
 
