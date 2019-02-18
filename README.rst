@@ -100,8 +100,24 @@ fetch\_
 Returns a list. If defining your own functions, do not use OFFSET and LIMIT, it will
 be appended by the extension.
 
+has\_
++++++
+
+Returns a bool, true or false. Query must return a single value!
+
+Common keyword arguments
+------------------------
+
+With all prepared queries, you may use cache (True/False) and cache_ttl arguments to control
+result caching. TTL is specified in seconds.
+
 List of functions
 -----------------
+
+get_autologin(key)
+++++++++++++++++++
+
+Gets autologin information. Used by session integration.
 
 get_session(session_id)
 +++++++++++++++++++++++
@@ -120,6 +136,26 @@ Use string named interpolation format (the psycopg one) to specify kwargs of a f
 Do not forget to use {TABLE_PREFIX} variable, to add specific table prefix. (First, the
 python variables from config get evaluated, and then psycopg variables).
 
+has_membership(user_id, group_id)
++++++++++++++++++++++++++++++++++
+
+Checks if user belongs to a group.
+
+has_membership_resolve(user_id, group_name)
++++++++++++++++++++++++++++++++++++++++++++
+
+Same as has_membership, only it works with group name.
+
+fetch_acl_options()
++++++++++++++++++++
+
+Fetches ACL data. Used by session integration.
+
+get_unread_notifications_count(user_id)
++++++++++++++++++++
+
+Retrieves user's unread notifications count. Used by session integration.
+
 Sessions integration
 --------------------
 
@@ -136,6 +172,13 @@ And you can use session's **is_authenticated** property to test if user is authe
 
   if session.is_authenticated:
     print 'User is authenticated!'
+
+Available is also the following API:
+  * is_member(group) - group may be id of the group or name
+  * has_privilege(option, forum_id=0) - tests if user has specified privilege
+  * has_privileges(*options, forum_id=0) - same as has_privilege, but for multiple privileges
+  * get_link_hash(link) - calculates hash
+  * num_unread_notifications - number of unread notifications for session user
 
 Caching
 -------
