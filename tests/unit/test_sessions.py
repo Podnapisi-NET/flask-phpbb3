@@ -176,3 +176,55 @@ class TestSessionUserMembership(TestSession):
 
         actual_result = self.session.is_member('group')
         self.assertFalse(actual_result)
+
+
+@mock.patch('flask_phpbb3.sessions.PhpBB3Session._phpbb3')
+class TestSessionUserPrivileges(TestSession):
+    def setUp(self):
+        # type: () -> None
+        super(TestSessionUserPrivileges, self).setUp()
+
+        self.session['user_permissions'] = ''
+
+    def test_load_data_privilege(self, mocked_phpbb3):
+        # type: (mock.Mock) -> None
+        self.session.has_privilege('m_view')
+
+        mocked_phpbb3.get_user_acl.assert_called_once_with('')
+
+    def test_load_data_privileges(self, mocked_phpbb3):
+        # type: (mock.Mock) -> None
+        self.session.has_privileges('m_view', 'm_edit')
+
+        mocked_phpbb3.get_user_acl.assert_called_once_with('')
+
+    def test_load_data_single(self, mocked_phpbb3):
+        # type: (mock.Mock) -> None
+        self.session.has_privilege('m_view')
+        self.session.has_privileges('m_view', 'm_edit')
+
+        mocked_phpbb3.get_user_acl.assert_called_once_with('')
+
+    def test_call_privilege(self, mocked_phpbb3):
+        # type: (mock.Mock) -> None
+        user_acl = mock.Mock()
+        mocked_phpbb3.get_user_acl.return_value = user_acl
+        forum_id = mock.Mock()
+
+        self.session.has_privilege('m_view', forum_id)
+
+        user_acl.has_privilege.assert_called_once_with('m_view', forum_id)
+
+    def test_call_privileges(self, mocked_phpbb3):
+        # type: (mock.Mock) -> None
+        user_acl = mock.Mock()
+        mocked_phpbb3.get_user_acl.return_value = user_acl
+        forum_id = mock.Mock()
+
+        self.session.has_privileges('m_view', 'm_edit', forum_id=forum_id)
+
+        user_acl.has_privileges.assert_called_once_with(
+            'm_view',
+            'm_edit',
+            forum_id=forum_id,
+        )
