@@ -228,3 +228,43 @@ class TestSessionUserPrivileges(TestSession):
             'm_edit',
             forum_id=forum_id,
         )
+
+
+@mock.patch('flask_phpbb3.sessions.PhpBB3Session._phpbb3')
+class TestUnreadNotificationsNum(TestSession):
+    def setUp(self):
+        # type: () -> None
+        super(TestUnreadNotificationsNum, self).setUp()
+
+        self.session['user_id'] = 2
+
+    def test_main(self, mocked_phpbb3):
+        # type: (mock.Mock) -> None
+        mocked_phpbb3.get_unread_notifications_count.return_value = {
+            'num': 3,
+        }
+
+        actual_result = self.session.num_unread_notifications
+        self.assertEqual(actual_result, 3)
+
+    def test_none(self, mocked_phpbb3):
+        # type: (mock.Mock) -> None
+        mocked_phpbb3.get_unread_notifications_count.return_value = None
+
+        actual_result = self.session.num_unread_notifications
+        self.assertEqual(actual_result, 0)
+
+    def test_cache(self, mocked_phpbb3):
+        # type: (mock.Mock) -> None
+        mocked_phpbb3.get_unread_notifications_count.return_value = {
+            'num': 3,
+        }
+        user_id = mock.Mock()
+        self.session['user_id'] = user_id
+
+        _ = self.session.num_unread_notifications
+        _ = self.session.num_unread_notifications
+
+        mocked_phpbb3.get_unread_notifications_count.assert_called_once_with(
+            user_id=user_id,
+        )
