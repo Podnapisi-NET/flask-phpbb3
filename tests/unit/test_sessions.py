@@ -5,6 +5,8 @@ import unittest
 
 import flask_phpbb3.sessions
 
+import mock
+
 
 class TestSession(unittest.TestCase):
     def setUp(self):
@@ -99,3 +101,78 @@ class TestSessionUser(TestSession):
         salted_link = self.session['user_form_salt'] + some_link
         expected_value = hashlib.sha1(salted_link).hexdigest()[:8]
         self.assertEqual(self.session.get_link_hash(some_link), expected_value)
+
+
+class TestSessionUserMembership(TestSession):
+    def setUp(self):
+        # type: () -> None
+        super(TestSessionUserMembership, self).setUp()
+
+        self.user_id = 2
+        self.group_id = 2
+        self.session['user_id'] = self.user_id
+        self.session['group_id'] = 2
+
+    def test_default_group_id(self):
+        # type: () -> None
+        self.session.is_member(self.group_id)
+
+    @mock.patch('flask_phpbb3.sessions.PhpBB3Session._phpbb3')
+    def test_group_id(self, patched_phpbb3):
+        # type: (mock.Mock) -> None
+        patched_phpbb3.has_membership.return_value = True
+
+        actual_result = self.session.is_member(5)
+        self.assertTrue(actual_result)
+        patched_phpbb3.has_membership.assert_called_once_with(
+            user_id=self.user_id,
+            group_id=5,
+        )
+
+    @mock.patch('flask_phpbb3.sessions.PhpBB3Session._phpbb3')
+    def test_group_id_failed(self, patched_phpbb3):
+        # type: (mock.Mock) -> None
+        patched_phpbb3.has_membership.return_value = False
+
+        actual_result = self.session.is_member(5)
+        self.assertFalse(actual_result)
+        patched_phpbb3.has_membership.assert_called_once_with(
+            user_id=self.user_id,
+            group_id=5,
+        )
+
+    @mock.patch('flask_phpbb3.sessions.PhpBB3Session._phpbb3')
+    def test_group_name(self, patched_phpbb3):
+        # type: (mock.Mock) -> None
+        patched_phpbb3.has_membership_resolve.return_value = True
+
+        actual_result = self.session.is_member('group')
+        self.assertTrue(actual_result)
+        patched_phpbb3.has_membership_resolve.assert_called_once_with(
+            user_id=self.user_id,
+            group_name='group',
+        )
+
+    @mock.patch('flask_phpbb3.sessions.PhpBB3Session._phpbb3')
+    def test_group_name_failed(self, patched_phpbb3):
+        # type: (mock.Mock) -> None
+        patched_phpbb3.has_membership_resolve.return_value = False
+
+        actual_result = self.session.is_member('group')
+        self.assertFalse(actual_result)
+        patched_phpbb3.has_membership_resolve.assert_called_once_with(
+            user_id=self.user_id,
+            group_name='group',
+        )
+
+    @mock.patch('flask_phpbb3.sessions.PhpBB3Session._phpbb3')
+    def test_nones(self, patched_phpbb3):
+        # type: (mock.Mock) -> None
+        patched_phpbb3.has_membership_resolve.return_value = None
+        patched_phpbb3.has_membership.return_value = None
+
+        actual_result = self.session.is_member(5)
+        self.assertFalse(actual_result)
+
+        actual_result = self.session.is_member('group')
+        self.assertFalse(actual_result)

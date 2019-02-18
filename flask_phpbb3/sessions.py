@@ -33,7 +33,7 @@ class PhpBB3Session(dict, flask.sessions.SessionMixin):
         self._request_cache = {}  # type: dict
 
     def __setitem__(self, key, value):
-        # type: (str, str) -> None
+        # type: (str, typing.Union[str, int]) -> None
         modified = self.get(key) != value
         super(PhpBB3Session, self).__setitem__(key, value)
         if key not in self._read_only_properties:
