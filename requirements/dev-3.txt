@@ -1,2 +1,2 @@
 -r dev.txt
-mypy
+mypy==0.660
