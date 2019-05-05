@@ -68,6 +68,7 @@ class PhpBB3(object):
         app.config['PHPBB3_DATABASE'].setdefault('USER', 'phpbb3')
         app.config['PHPBB3_DATABASE'].setdefault('PASSWORD', '')
         app.config['PHPBB3_DATABASE'].setdefault('TABLE_PREFIX', 'phpbb_')
+        app.config['PHPBB3_DATABASE'].setdefault('CUSTOM_USER_FIELDS', [])
         app.config.setdefault('PHPBB3_SESSION_BACKEND', {})
         app.config['PHPBB3_SESSION_BACKEND'].setdefault('TYPE', 'simple')
 
