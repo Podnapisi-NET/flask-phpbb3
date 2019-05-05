@@ -124,20 +124,42 @@ class PhpBB3(object):
 
     def get_autologin(self, key, cache=False, cache_ttl=None):
         # type: (str, bool, typing.Optional[int]) -> typing.Optional[dict]
-        output = self._backend.execute('get_autologin', key=key)\
-            # type: typing.Optional[dict]
+        output = self._backend.execute(
+            'get_autologin',
+            key=key,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[dict]
         return output
 
     def get_session(self, session_id, cache=False, cache_ttl=None):
         # type: (str, bool, typing.Optional[int]) -> typing.Optional[dict]
-        output = self._backend.execute('get_session', session_id=session_id)\
-            # type: typing.Optional[dict]
+        output = self._backend.execute(
+            'get_session',
+            session_id=session_id,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[dict]
         return output
 
     def get_user(self, user_id, cache=False, cache_ttl=None):
         # type: (int, bool, typing.Optional[int]) -> typing.Optional[dict]
-        output = self._backend.execute('get_user', user_id=user_id)\
-            # type: typing.Optional[dict]
+        output = self._backend.execute(
+            'get_user',
+            user_id=user_id,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[dict]
+        return output
+
+    def get_user_profile(self, user_id, cache=False, cache_ttl=None):
+        # type: (int, bool, typing.Optional[int]) -> typing.Optional[dict]
+        output = self._backend.execute(
+            'get_user_profile',
+            user_id=user_id,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[dict]
         return output
 
     def has_membership(
@@ -209,6 +231,22 @@ class PhpBB3(object):
     def get_user_acl(self, raw_user_permissions):
         # type: (str) -> flask_phpbb3.backends.base.UserAcl
         return self._backend.get_user_acl(raw_user_permissions)
+
+    def execute_custom(
+        self,
+        command,  # type: str
+        cache=False,  # type: bool
+        cache_ttl=None,  # type: typing.Optional[int]
+        **kwargs  # type: typing.Any
+    ):
+        # type: (...) -> typing.Any
+        output = self._backend.execute(
+            command,
+            cache=cache,
+            cache_ttl=cache_ttl,
+            **kwargs
+        )  # type: typing.Any
+        return output
 
     def teardown(self, exception):
         # type: (typing.Any) -> None
