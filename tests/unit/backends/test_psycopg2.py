@@ -106,3 +106,139 @@ class TestExecuteOperation(unittest.TestCase):
 
         # Internal function, this should never happen
         self.assertIsNone(actual_value)
+
+
+@mock.patch('flask_phpbb3.backends.psycopg2.Psycopg2Backend._db')
+class TestPreparedCustomFieldsStatements(unittest.TestCase):
+    def test_empty(self, mocked_db):
+        connection = flask_phpbb3.backends.psycopg2.Psycopg2Backend(
+            werkzeug.contrib.cache.SimpleCache(),
+            {
+                'TABLE_PREFIX': '',
+                'CUSTOM_USER_FIELDS': [],
+            }
+        )
+
+        self.assertListEqual(
+            connection._functions.keys(),
+            [
+                'has_membership_resolve',
+                'get_autologin',
+                'get_session',
+                'has_membership',
+                'fetch_acl_options',
+                'get_unread_notifications_count',
+                'get_user',
+                'get_user_profile',
+            ]
+        )
+
+    def test_valid(self, mocked_db):
+        connection = flask_phpbb3.backends.psycopg2.Psycopg2Backend(
+            werkzeug.contrib.cache.SimpleCache(),
+            {
+                'TABLE_PREFIX': '',
+                'CUSTOM_USER_FIELDS': ['some_field', 'another_field'],
+            }
+        )
+
+        self.assertSetEqual(
+            set(connection._functions.keys()),
+            set([
+                'has_membership_resolve',
+                'get_autologin',
+                'get_session',
+                'set_some_field',
+                'has_membership',
+                'fetch_acl_options',
+                'set_another_field',
+                'get_unread_notifications_count',
+                'get_user',
+                'get_user_profile',
+            ]),
+        )
+
+
+@mock.patch('flask_phpbb3.backends.psycopg2.Psycopg2Backend._db')
+class TestPreparedCustomStatements(unittest.TestCase):
+    def test_empty(self, mocked_db):
+        connection = flask_phpbb3.backends.psycopg2.Psycopg2Backend(
+            werkzeug.contrib.cache.SimpleCache(),
+            {
+                'TABLE_PREFIX': '',
+                'CUSTOM_STATEMENTS': {},
+            }
+        )
+
+        self.assertListEqual(
+            connection._functions.keys(),
+            [
+                'has_membership_resolve',
+                'get_autologin',
+                'get_session',
+                'has_membership',
+                'fetch_acl_options',
+                'get_unread_notifications_count',
+                'get_user',
+                'get_user_profile',
+            ]
+        )
+
+    def test_addition(self, mocked_db):
+        connection = flask_phpbb3.backends.psycopg2.Psycopg2Backend(
+            werkzeug.contrib.cache.SimpleCache(),
+            {
+                'TABLE_PREFIX': '',
+                'CUSTOM_STATEMENTS': {
+                    'some_custom_statement': 'some query',
+                },
+            }
+        )
+
+        self.assertListEqual(
+            connection._functions.keys(),
+            [
+                'has_membership_resolve',
+                'get_autologin',
+                'get_session',
+                'has_membership',
+                'fetch_acl_options',
+                'get_unread_notifications_count',
+                'some_custom_statement',
+                'get_user',
+                'get_user_profile',
+            ]
+        )
+        self.assertEqual(
+            connection._functions['some_custom_statement'],
+            'some query',
+        )
+
+    def test_override(self, mocked_db):
+        connection = flask_phpbb3.backends.psycopg2.Psycopg2Backend(
+            werkzeug.contrib.cache.SimpleCache(),
+            {
+                'TABLE_PREFIX': '',
+                'CUSTOM_STATEMENTS': {
+                    'get_autologin': 'overriden',
+                },
+            }
+        )
+
+        self.assertListEqual(
+            connection._functions.keys(),
+            [
+                'has_membership_resolve',
+                'get_autologin',
+                'get_session',
+                'has_membership',
+                'fetch_acl_options',
+                'get_unread_notifications_count',
+                'get_user',
+                'get_user_profile',
+            ]
+        )
+        self.assertEqual(
+            connection._functions['get_autologin'],
+            'overriden',
+        )

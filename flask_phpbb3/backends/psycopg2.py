@@ -58,6 +58,10 @@ class Psycopg2Backend(base.BaseBackend):
                 "SELECT * "
                 "FROM {TABLE_PREFIX}users "
                 "WHERE user_id = %(user_id)s"),
+            get_user_profile=(
+                "SELECT * "
+                "FROM {TABLE_PREFIX}profile_fields_data "
+                "WHERE user_id = %(user_id)s"),
             has_membership=(
                 "SELECT ug.group_id "
                 "FROM {TABLE_PREFIX}user_group ug "
@@ -98,7 +102,29 @@ class Psycopg2Backend(base.BaseBackend):
             ),
         ))
 
+        self._prepare_custom_fields_statements()
+
         # TODO Add/Move to version specific queries
+
+    def _prepare_custom_fields_statements(self):
+        # type: () -> None
+        """
+        Prepares statements for custom fields
+        """
+        # Setters for custom fields
+        custom_fields = self._config.get('CUSTOM_USER_FIELDS', [])
+        for custom_field in custom_fields:
+            self._functions["set_{0}".format(custom_field)] = (
+                "UPDATE"
+                "   {TABLE_PREFIX}profile_fields_data"
+                " SET"
+                "   `pf_{field}` = %(value)s"
+                " WHERE"
+                "   user_id = %(user_id)s"
+            ).format(
+                TABLE_PREFIX=self._config['TABLE_PREFIX'],
+                field=custom_field,
+            )
 
     def _sql_query(
         self,
