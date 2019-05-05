@@ -124,26 +124,42 @@ class PhpBB3(object):
 
     def get_autologin(self, key, cache=False, cache_ttl=None):
         # type: (str, bool, typing.Optional[int]) -> typing.Optional[dict]
-        output = self._backend.execute('get_autologin', key=key)\
-            # type: typing.Optional[dict]
+        output = self._backend.execute(
+            'get_autologin',
+            key=key,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[dict]
         return output
 
     def get_session(self, session_id, cache=False, cache_ttl=None):
         # type: (str, bool, typing.Optional[int]) -> typing.Optional[dict]
-        output = self._backend.execute('get_session', session_id=session_id)\
-            # type: typing.Optional[dict]
+        output = self._backend.execute(
+            'get_session',
+            session_id=session_id,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[dict]
         return output
 
     def get_user(self, user_id, cache=False, cache_ttl=None):
         # type: (int, bool, typing.Optional[int]) -> typing.Optional[dict]
-        output = self._backend.execute('get_user', user_id=user_id)\
-            # type: typing.Optional[dict]
+        output = self._backend.execute(
+            'get_user',
+            user_id=user_id,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[dict]
         return output
 
     def get_user_profile(self, user_id, cache=False, cache_ttl=None):
         # type: (int, bool, typing.Optional[int]) -> typing.Optional[dict]
-        output = self._backend.execute('get_user_profile', user_id=user_id)\
-            # type: typing.Optional[dict]
+        output = self._backend.execute(
+            'get_user_profile',
+            user_id=user_id,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        )  # type: typing.Optional[dict]
         return output
 
     def has_membership(
