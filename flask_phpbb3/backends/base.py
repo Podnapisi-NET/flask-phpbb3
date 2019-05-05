@@ -30,6 +30,10 @@ class BaseBackend(object):
         self._config = config
 
         self._prepare_statements()
+        custom_statements = self._config.get('CUSTOM_STATEMENTS', {})
+        if not isinstance(custom_statements, dict):
+            custom_statements = {}
+        self._functions.update(custom_statements)
 
     def _setup_connection(self):
         # type: () -> None

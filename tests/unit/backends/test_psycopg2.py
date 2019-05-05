@@ -157,3 +157,88 @@ class TestPreparedCustomFieldsStatements(unittest.TestCase):
                 'get_user_profile',
             ]),
         )
+
+
+@mock.patch('flask_phpbb3.backends.psycopg2.Psycopg2Backend._db')
+class TestPreparedCustomStatements(unittest.TestCase):
+    def test_empty(self, mocked_db):
+        connection = flask_phpbb3.backends.psycopg2.Psycopg2Backend(
+            werkzeug.contrib.cache.SimpleCache(),
+            {
+                'TABLE_PREFIX': '',
+                'CUSTOM_STATEMENTS': {},
+            }
+        )
+
+        self.assertListEqual(
+            connection._functions.keys(),
+            [
+                'has_membership_resolve',
+                'get_autologin',
+                'get_session',
+                'has_membership',
+                'fetch_acl_options',
+                'get_unread_notifications_count',
+                'get_user',
+                'get_user_profile',
+            ]
+        )
+
+    def test_addition(self, mocked_db):
+        connection = flask_phpbb3.backends.psycopg2.Psycopg2Backend(
+            werkzeug.contrib.cache.SimpleCache(),
+            {
+                'TABLE_PREFIX': '',
+                'CUSTOM_STATEMENTS': {
+                    'some_custom_statement': 'some query',
+                },
+            }
+        )
+
+        self.assertListEqual(
+            connection._functions.keys(),
+            [
+                'has_membership_resolve',
+                'get_autologin',
+                'get_session',
+                'has_membership',
+                'fetch_acl_options',
+                'get_unread_notifications_count',
+                'some_custom_statement',
+                'get_user',
+                'get_user_profile',
+            ]
+        )
+        self.assertEqual(
+            connection._functions['some_custom_statement'],
+            'some query',
+        )
+
+    def test_override(self, mocked_db):
+        connection = flask_phpbb3.backends.psycopg2.Psycopg2Backend(
+            werkzeug.contrib.cache.SimpleCache(),
+            {
+                'TABLE_PREFIX': '',
+                'CUSTOM_STATEMENTS': {
+                    'get_autologin': 'overriden',
+                },
+            }
+        )
+
+        self.assertListEqual(
+            connection._functions.keys(),
+            [
+                'has_membership_resolve',
+                'get_autologin',
+                'get_session',
+                'has_membership',
+                'fetch_acl_options',
+                'get_unread_notifications_count',
+                'get_user',
+                'get_user_profile',
+            ]
+        )
+        self.assertEqual(
+            connection._functions['get_autologin'],
+            'overriden',
+        )
