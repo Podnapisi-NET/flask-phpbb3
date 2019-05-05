@@ -37,6 +37,10 @@ Settings
     + **USER** - User for connecting to database, default is phpbb3
     + **PASSWORD** - Database user's password, default is empty
     + **TABLE_PREFIX** - Table prefix of phpBB3 tables, default is phpbb\_
+    + **CUSTOM_USER_FIELDS** - List of custom fields setup in phpBB3 forum
+    + **CUSTOM_STATEMENTS** - Dictionary of prepared statements to add or
+                              override. **Careful** with raw queries, use
+                              `{TABLE_PREFIX}` to re-use configured prefix
 
   * PHPBB3_SESSION_BACKEND - Setting up session backend, it configures the werkzeug cache subsystem
 
@@ -113,7 +117,7 @@ get_user(user_id)
 Gets user settings and profile.
 
 Use string named interpolation format (the psycopg one) to specify kwargs of a function.
-Do not forget to use {TABLE_PREFFIX} variable, to add specific table prefix. (First, the
+Do not forget to use {TABLE_PREFIX} variable, to add specific table prefix. (First, the
 python variables from config get evaluated, and then psycopg variables).
 
 Sessions integration
