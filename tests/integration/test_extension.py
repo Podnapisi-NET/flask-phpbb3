@@ -69,6 +69,12 @@ class TestFetch(base.TestWithDatabase):
             privilege = self.app.phpbb3.fetch_acl_options(skip=skip, limit=1)
             self.assertEqual((skip, privilege), expected_privileges[skip])
 
+    def test_fetch_global_Topics(self):
+        expected_topics = [[(0,),(1,),(2,),(3,),(4,),(5,)]]
+        for skip in range(0, 5):
+            topic=self.app.phpbb3.fetch_global_topics(skip=skip, limit=1, forum_id=0)
+            self.assertEqual((skip,topic), expected_topics[skip])
+
 
 class TestSession(base.TestWithDatabase):
     def setUp(self):

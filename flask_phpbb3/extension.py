@@ -228,6 +228,24 @@ class PhpBB3(object):
         )  # type: typing.Optional[dict]
         return output
 
+    def fetch_global_topics(
+            self,
+            forum_id,
+            skip=0,
+            limit=10,
+            cache=False,
+            cache_ttl=None,
+    ):
+        output = self._backend.execute(
+            'get_global_topics',
+            forum_id=forum_id,
+            skip=skip,
+            limit=limit,
+            cache=cache,
+            cache_ttl=cache_ttl,
+        ) # type: typing.Optional[dict]
+        return output
+
     def get_user_acl(self, raw_user_permissions):
         # type: (str) -> flask_phpbb3.backends.base.UserAcl
         return self._backend.get_user_acl(raw_user_permissions)

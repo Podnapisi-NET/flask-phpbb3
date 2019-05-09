@@ -130,6 +130,7 @@ class TestPreparedCustomFieldsStatements(unittest.TestCase):
                 'get_unread_notifications_count',
                 'get_user',
                 'get_user_profile',
+                'fetch_global_topics',
             ]
         )
 
@@ -155,6 +156,7 @@ class TestPreparedCustomFieldsStatements(unittest.TestCase):
                 'get_unread_notifications_count',
                 'get_user',
                 'get_user_profile',
+                'fetch_global_topics',
             ]),
         )
 
@@ -181,6 +183,7 @@ class TestPreparedCustomStatements(unittest.TestCase):
                 'get_unread_notifications_count',
                 'get_user',
                 'get_user_profile',
+                'fetch_global_topics',
             ]
         )
 
@@ -207,6 +210,7 @@ class TestPreparedCustomStatements(unittest.TestCase):
                 'some_custom_statement',
                 'get_user',
                 'get_user_profile',
+                'fetch_global_topics',
             ]
         )
         self.assertEqual(
@@ -236,6 +240,7 @@ class TestPreparedCustomStatements(unittest.TestCase):
                 'get_unread_notifications_count',
                 'get_user',
                 'get_user_profile',
+                'fetch_global_topics',
             ]
         )
         self.assertEqual(

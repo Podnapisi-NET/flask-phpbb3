@@ -100,6 +100,23 @@ class Psycopg2Backend(base.BaseBackend):
                 "   AND nt.notification_type_enabled=1 "
                 "   AND n.notification_read=0"
             ),
+            fetch_global_topics=(
+                "SELECT"
+                "  t.topic_id,"
+                "  t.forum_id,"
+                "  t.topic_title,"
+                "  t.topic_time,"
+                "  t.topic_first_poster_name,"
+                "  p.post_subject,"
+                "  p.post_text "
+                "  FROM  "
+                "  {TABLE_PREFIX}topics t"                                 
+                " INNER JOIN {TABLE_PREFIX}posts p ON"
+                "  p.post_id = t.topic_first_post_id"
+                " WHERE"
+                "  t.topic_type = 3"
+                "  AND t.forum_id = %(forum_id)s"
+            ),
         ))
 
         self._prepare_custom_fields_statements()
