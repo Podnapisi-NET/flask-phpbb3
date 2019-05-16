@@ -69,11 +69,43 @@ class TestFetch(base.TestWithDatabase):
             privilege = self.app.phpbb3.fetch_acl_options(skip=skip, limit=1)
             self.assertEqual((skip, privilege), expected_privileges[skip])
 
-    def test_fetch_global_Topics(self):
-        expected_topics = [[(0,),(1,),(2,),(3,),(4,),(5,)]]
-        for skip in range(0, 5):
-            topic=self.app.phpbb3.fetch_global_topics(skip=skip, limit=1, forum_id=0)
-            self.assertEqual((skip,topic), expected_topics[skip])
+    def test_fetch_global_topics(self):
+        expected_topics = [(0, [{
+                                'topic_id': 0,
+                                'forum_id': 0,
+                                'topic_title': 'naslov_teme_0',
+                                'topic_time': 10,
+                                'topic_first_poster_name': 'ime',
+                                'post_subject': 'prva tema',
+                                'post_text': 'bla'}]),
+
+                           (1, [{
+                                'topic_id': 1,
+                                'forum_id': 0,
+                                'topic_title': 'naslov teme 1',
+                                'topic_time': 13,
+                                'topic_first_poster_name': 'drugi poster',
+                                'post_subject': 'druga tema',
+                                'post_text': 'blabla'}]),
+                           (2, [{
+                                'topic_id': 2,
+                                'forum_id': 0,
+                                'topic_title': 'naslov teme 2',
+                                'topic_time': 200,
+                                'topic_first_poster_name': 'post it',
+                                'post_subject': 'tretja tema',
+                                'post_text': 'blablabla'}]),
+                           (3, [{
+                                'topic_id': 3,
+                                'forum_id': 0,
+                                'topic_title': 'naslov teme 3',
+                                'topic_time': 256,
+                                'topic_first_poster_name': 'posted it',
+                                'post_subject': 'tretja tema',
+                                'post_text': 'bla x4'}])]
+        for skip in range(0, 3):
+            topic = self.app.phpbb3.fetch_global_topics(skip=skip, limit=1, forum_id=0)
+            self.assertEqual((skip, topic), expected_topics[skip])
 
 
 class TestSession(base.TestWithDatabase):
