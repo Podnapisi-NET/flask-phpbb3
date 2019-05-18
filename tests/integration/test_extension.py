@@ -107,7 +107,10 @@ class TestFetch(base.TestWithDatabase):
                                 'post_subject': 'tretja tema',
                                 'post_text': 'bla x4'}])]
         for skip in range(0, 3):
-            topic = self.app.phpbb3.fetch_global_topics(skip=skip, limit=1, forum_id=0)
+            topic = self.app.phpbb3.fetch_global_topics(
+                skip=skip,
+                limit=1,
+                forum_id=0)
             self.assertEqual((skip, topic), expected_topics[skip])
 
 

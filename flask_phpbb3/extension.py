@@ -244,7 +244,7 @@ class PhpBB3(object):
             limit=limit,
             cache=cache,
             cache_ttl=cache_ttl,
-        ) # type: typing.Optional[dict]
+        )  # type: typing.Optional[dict]
         return output
 
     def get_user_acl(self, raw_user_permissions):

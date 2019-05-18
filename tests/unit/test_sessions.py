@@ -268,5 +268,3 @@ class TestUnreadNotificationsNum(TestSession):
         mocked_phpbb3.get_unread_notifications_count.assert_called_once_with(
             user_id=user_id,
         )
-
-
