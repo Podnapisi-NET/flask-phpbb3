@@ -70,6 +70,7 @@ class TestFetch(base.TestWithDatabase):
             self.assertEqual((skip, privilege), expected_privileges[skip])
 
     def test_fetch_global_topics(self):
+        # type: () -> None
         base._create_global_topics(self.cursor)
 
         expected_topics = [(0, [{

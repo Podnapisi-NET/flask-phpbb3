@@ -236,6 +236,7 @@ class PhpBB3(object):
             cache=False,
             cache_ttl=None,
     ):
+        # type: (...) -> typing.Optional[dict]
         output = self._backend.execute(
             'fetch_global_topics',
             forum_id=forum_id,
