@@ -126,11 +126,11 @@ class TestPreparedCustomFieldsStatements(unittest.TestCase):
                 'get_autologin',
                 'get_session',
                 'has_membership',
+                'fetch_global_topics',
                 'fetch_acl_options',
                 'get_unread_notifications_count',
                 'get_user',
                 'get_user_profile',
-                'fetch_global_topics',
             ]
         )
 
@@ -151,12 +151,12 @@ class TestPreparedCustomFieldsStatements(unittest.TestCase):
                 'get_session',
                 'set_some_field',
                 'has_membership',
+                'fetch_global_topics',
                 'fetch_acl_options',
                 'set_another_field',
                 'get_unread_notifications_count',
                 'get_user',
                 'get_user_profile',
-                'fetch_global_topics',
             ]),
         )
 
@@ -179,11 +179,11 @@ class TestPreparedCustomStatements(unittest.TestCase):
                 'get_autologin',
                 'get_session',
                 'has_membership',
+                'fetch_global_topics',
                 'fetch_acl_options',
                 'get_unread_notifications_count',
                 'get_user',
                 'get_user_profile',
-                'fetch_global_topics',
             ]
         )
 
@@ -205,12 +205,12 @@ class TestPreparedCustomStatements(unittest.TestCase):
                 'get_autologin',
                 'get_session',
                 'has_membership',
+                'fetch_global_topics',
                 'fetch_acl_options',
                 'get_unread_notifications_count',
                 'some_custom_statement',
                 'get_user',
                 'get_user_profile',
-                'fetch_global_topics',
             ]
         )
         self.assertEqual(
@@ -236,11 +236,11 @@ class TestPreparedCustomStatements(unittest.TestCase):
                 'get_autologin',
                 'get_session',
                 'has_membership',
+                'fetch_global_topics',
                 'fetch_acl_options',
                 'get_unread_notifications_count',
                 'get_user',
                 'get_user_profile',
-                'fetch_global_topics',
             ]
         )
         self.assertEqual(

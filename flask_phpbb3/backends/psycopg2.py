@@ -100,8 +100,8 @@ class Psycopg2Backend(base.BaseBackend):
                 "   AND nt.notification_type_enabled=1 "
                 "   AND n.notification_read=0"
             ),
-            fetch_global_topics=(
-                "SELECT"
+           fetch_global_topics=(
+               "SELECT"
                 "  t.topic_id,"
                 "  t.forum_id,"
                 "  t.topic_title,"
@@ -110,12 +110,13 @@ class Psycopg2Backend(base.BaseBackend):
                 "  p.post_subject,"
                 "  p.post_text "
                 "  FROM  "
-                "  {TABLE_PREFIX}topics t"                                 
+                "  {TABLE_PREFIX}topics t"
                 " INNER JOIN {TABLE_PREFIX}posts p ON"
                 "  p.post_id = t.topic_first_post_id"
                 " WHERE"
                 "  t.topic_type = 3"
                 "  AND t.forum_id = %(forum_id)s"
+               " order by t.topic_id "
             ),
         ))
 
@@ -248,7 +249,6 @@ class Psycopg2Backend(base.BaseBackend):
             ))
 
         operation = command.split('_')[0]
-
         func_or_query = self._functions[command]
         if callable(func_or_query):
             return func_or_query(**kwargs)

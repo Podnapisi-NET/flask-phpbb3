@@ -70,6 +70,8 @@ class TestFetch(base.TestWithDatabase):
             self.assertEqual((skip, privilege), expected_privileges[skip])
 
     def test_fetch_global_topics(self):
+        base._create_global_topics(self.cursor)
+
         expected_topics = [(0, [{
                                 'topic_id': 0,
                                 'forum_id': 0,
@@ -174,6 +176,7 @@ class TestSession(base.TestWithDatabase):
         base._create_session(self.cursor, self.session_id, 2)
         base._create_privilege(self.cursor, 1, 'm_edit')
         base._grant_privilege(self.cursor, 2)
+        base._create_global_topics(self.cursor)
 
         data = self.client.get('/priv_test').data
         self.assertEqual(data, 'False,False,False')

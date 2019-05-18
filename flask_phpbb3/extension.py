@@ -230,14 +230,14 @@ class PhpBB3(object):
 
     def fetch_global_topics(
             self,
-            forum_id,
+            forum_id=0,
             skip=0,
             limit=10,
             cache=False,
             cache_ttl=None,
     ):
         output = self._backend.execute(
-            'get_global_topics',
+            'fetch_global_topics',
             forum_id=forum_id,
             skip=skip,
             limit=limit,

@@ -122,6 +122,26 @@ def _create_session(cursor, session_id, user_id):
     )
 
 
+def _create_global_topics(cursor):
+    cursor.execute(
+        "insert into"            
+        " phpbb_topics(topic_id, forum_id, topic_title, topic_time,"
+        "  topic_first_poster_name, topic_first_post_id, topic_type)"
+        " values (0,0,'naslov_teme_0',10,'ime',0,3),"         
+        " (1,0,'naslov teme 1',13,'drugi poster',1,3),"
+        " (2,0,'naslov teme 2',200,'post it',2,3),"
+        " (3,0,'naslov teme 3',256,'posted it',3,3)"
+        )
+    cursor.execute(
+        " insert into "
+        " phpbb_posts(post_id,post_subject,post_text)"
+        " values (0,'prva tema', 'bla'),"
+        " (1,'druga tema','blabla'),"
+        " (2,'tretja tema','blablabla'),"
+        " (3,'tretja tema','bla krat 4')"
+     )
+
+
 def _create_privilege(cursor, privilege_id, privilege):
     # type: (psycopg2.extensions.cursor, int, str) -> None
     cursor.execute(

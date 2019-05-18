@@ -156,3 +156,156 @@ create table phpbb_notification_types (
     notification_type_name  character varying(255)  not null default ''::character varying,
     notification_type_enabled  smallint  not null default (1)::smallint
 );
+
+
+CREATE TABLE phpbb_topics (
+    topic_id integer DEFAULT 0 NOT NULL,
+    forum_id integer DEFAULT 0 NOT NULL,
+    icon_id integer DEFAULT 0 NOT NULL,
+    topic_attachment smallint DEFAULT (0)::smallint NOT NULL,
+    topic_reported smallint DEFAULT (0)::smallint NOT NULL,
+    topic_title character varying(255) DEFAULT ''::character varying NOT NULL,
+    topic_poster integer DEFAULT 0 NOT NULL,
+    topic_time integer DEFAULT 0 NOT NULL,
+    topic_time_limit integer DEFAULT 0 NOT NULL,
+    topic_views integer DEFAULT 0 NOT NULL,
+    topic_status smallint DEFAULT (0)::smallint NOT NULL,
+    topic_type smallint DEFAULT (0)::smallint NOT NULL,
+    topic_first_post_id integer DEFAULT 0 NOT NULL,
+    topic_first_poster_name character varying(255) DEFAULT ''::character varying NOT NULL,
+    topic_first_poster_colour character varying(6) DEFAULT ''::character varying NOT NULL,
+    topic_last_post_id integer DEFAULT 0 NOT NULL,
+    topic_last_poster_id integer DEFAULT 0 NOT NULL,
+    topic_last_poster_name character varying(255) DEFAULT ''::character varying NOT NULL,
+    topic_last_poster_colour character varying(6) DEFAULT ''::character varying NOT NULL,
+    topic_last_post_subject character varying(255) DEFAULT ''::character varying NOT NULL,
+    topic_last_post_time integer DEFAULT 0 NOT NULL,
+    topic_last_view_time integer DEFAULT 0 NOT NULL,
+    topic_moved_id integer DEFAULT 0 NOT NULL,
+    topic_bumped smallint DEFAULT (0)::smallint NOT NULL,
+    topic_bumper integer DEFAULT 0 NOT NULL,
+    poll_title character varying(255) DEFAULT ''::character varying NOT NULL,
+    poll_start integer DEFAULT 0 NOT NULL,
+    poll_length integer DEFAULT 0 NOT NULL,
+    poll_max_options smallint DEFAULT (1)::smallint NOT NULL,
+    poll_last_vote integer DEFAULT 0 NOT NULL,
+    poll_vote_change smallint DEFAULT (0)::smallint NOT NULL,
+    topic_visibility smallint DEFAULT (0)::smallint NOT NULL,
+    topic_delete_time integer DEFAULT 0 NOT NULL,
+    topic_delete_reason character varying(255) DEFAULT ''::character varying NOT NULL,
+    topic_delete_user integer DEFAULT 0 NOT NULL,
+    topic_posts_approved integer DEFAULT 0 NOT NULL,
+    topic_posts_unapproved integer DEFAULT 0 NOT NULL,
+    topic_posts_softdeleted integer DEFAULT 0 NOT NULL,
+    CONSTRAINT phpbb_topics_forum_id_check CHECK ((forum_id >= 0)),
+    CONSTRAINT phpbb_topics_icon_id_check CHECK ((icon_id >= 0)),
+    CONSTRAINT phpbb_topics_poll_last_vote_check CHECK ((poll_last_vote >= 0)),
+    CONSTRAINT phpbb_topics_poll_length_check CHECK ((poll_length >= 0)),
+    CONSTRAINT phpbb_topics_poll_start_check CHECK ((poll_start >= 0)),
+    CONSTRAINT phpbb_topics_poll_vote_change_check CHECK ((poll_vote_change >= 0)),
+    CONSTRAINT phpbb_topics_topic_attachment_check CHECK ((topic_attachment >= 0)),
+    CONSTRAINT phpbb_topics_topic_bumped_check CHECK ((topic_bumped >= 0)),
+    CONSTRAINT phpbb_topics_topic_bumper_check CHECK ((topic_bumper >= 0)),
+    CONSTRAINT phpbb_topics_topic_delete_time_check CHECK ((topic_delete_time >= 0)),
+    CONSTRAINT phpbb_topics_topic_delete_user_check CHECK ((topic_delete_user >= 0)),
+    CONSTRAINT phpbb_topics_topic_delete_user_check1 CHECK ((topic_delete_user >= 0)),
+    CONSTRAINT phpbb_topics_topic_first_post_id_check CHECK ((topic_first_post_id >= 0)),
+    CONSTRAINT phpbb_topics_topic_first_post_id_check1 CHECK ((topic_first_post_id >= 0)),
+    CONSTRAINT phpbb_topics_topic_id_check CHECK ((topic_id >= 0)),
+    CONSTRAINT phpbb_topics_topic_last_post_id_check CHECK ((topic_last_post_id >= 0)),
+    CONSTRAINT phpbb_topics_topic_last_post_id_check1 CHECK ((topic_last_post_id >= 0)),
+    CONSTRAINT phpbb_topics_topic_last_post_time_check CHECK ((topic_last_post_time >= 0)),
+    CONSTRAINT phpbb_topics_topic_last_poster_id_check CHECK ((topic_last_poster_id >= 0)),
+    CONSTRAINT phpbb_topics_topic_last_poster_id_check1 CHECK ((topic_last_poster_id >= 0)),
+    CONSTRAINT phpbb_topics_topic_last_view_time_check CHECK ((topic_last_view_time >= 0)),
+    CONSTRAINT phpbb_topics_topic_moved_id_check CHECK ((topic_moved_id >= 0)),
+    CONSTRAINT phpbb_topics_topic_moved_id_check1 CHECK ((topic_moved_id >= 0)),
+    CONSTRAINT phpbb_topics_topic_poster_check CHECK ((topic_poster >= 0)),
+    CONSTRAINT phpbb_topics_topic_poster_check1 CHECK ((topic_poster >= 0)),
+    CONSTRAINT phpbb_topics_topic_posts_approved_check CHECK ((topic_posts_approved >= 0)),
+    CONSTRAINT phpbb_topics_topic_posts_softdeleted_check CHECK ((topic_posts_softdeleted >= 0)),
+    CONSTRAINT phpbb_topics_topic_posts_unapproved_check CHECK ((topic_posts_unapproved >= 0)),
+    CONSTRAINT phpbb_topics_topic_reported_check CHECK ((topic_reported >= 0)),
+    CONSTRAINT phpbb_topics_topic_time_check CHECK ((topic_time >= 0)),
+    CONSTRAINT phpbb_topics_topic_time_limit_check CHECK ((topic_time_limit >= 0)),
+    CONSTRAINT phpbb_topics_topic_views_check CHECK ((topic_views >= 0))
+);
+ALTER TABLE ONLY phpbb_topics
+    ADD CONSTRAINT phpbb_topics_pkey PRIMARY KEY (topic_id);
+CREATE INDEX phpbb_topics_fid_time_moved ON phpbb_topics USING btree (forum_id, topic_last_post_time, topic_moved_id);
+CREATE INDEX phpbb_topics_forum_id ON phpbb_topics USING btree (forum_id);
+CREATE INDEX phpbb_topics_forum_id_type ON phpbb_topics USING btree (forum_id, topic_type);
+CREATE INDEX phpbb_topics_forum_vis_last ON phpbb_topics USING btree (forum_id, topic_visibility, topic_last_post_id);
+CREATE INDEX phpbb_topics_last_post_time ON phpbb_topics USING btree (topic_last_post_time);
+CREATE INDEX phpbb_topics_latest_topics ON phpbb_topics USING btree (forum_id, topic_last_post_time, topic_last_post_id, topic_moved_id);
+CREATE INDEX phpbb_topics_topic_visibility ON phpbb_topics USING btree (topic_visibility);
+
+
+CREATE TABLE phpbb_posts (
+    post_id integer DEFAULT 0 NOT NULL,
+    topic_id integer DEFAULT 0 NOT NULL,
+    forum_id integer DEFAULT 0 NOT NULL,
+    poster_id integer DEFAULT 0 NOT NULL,
+    icon_id integer DEFAULT 0 NOT NULL,
+    poster_ip character varying(40) DEFAULT ''::character varying NOT NULL,
+    post_time integer DEFAULT 0 NOT NULL,
+    post_reported smallint DEFAULT (0)::smallint NOT NULL,
+    enable_bbcode smallint DEFAULT (1)::smallint NOT NULL,
+    enable_smilies smallint DEFAULT (1)::smallint NOT NULL,
+    enable_magic_url smallint DEFAULT (1)::smallint NOT NULL,
+    enable_sig smallint DEFAULT (1)::smallint NOT NULL,
+    post_username character varying(255) DEFAULT ''::character varying NOT NULL,
+    post_subject character varying(255) DEFAULT ''::character varying NOT NULL,
+    post_text text DEFAULT ''::text NOT NULL,
+    post_checksum character varying(32) DEFAULT ''::character varying NOT NULL,
+    post_attachment smallint DEFAULT (0)::smallint NOT NULL,
+    bbcode_bitfield character varying(255) DEFAULT ''::character varying NOT NULL,
+    bbcode_uid character varying(8) DEFAULT ''::character varying NOT NULL,
+    post_postcount smallint DEFAULT (1)::smallint NOT NULL,
+    post_edit_time integer DEFAULT 0 NOT NULL,
+    post_edit_reason character varying(255) DEFAULT ''::character varying NOT NULL,
+    post_edit_user integer DEFAULT 0 NOT NULL,
+    post_edit_count smallint DEFAULT (0)::smallint NOT NULL,
+    post_edit_locked smallint DEFAULT (0)::smallint NOT NULL,
+    post_visibility smallint DEFAULT (0)::smallint NOT NULL,
+    post_delete_time integer DEFAULT 0 NOT NULL,
+    post_delete_reason character varying(255) DEFAULT ''::character varying NOT NULL,
+    post_delete_user integer DEFAULT 0 NOT NULL,
+    CONSTRAINT phpbb_posts_enable_bbcode_check CHECK ((enable_bbcode >= 0)),
+    CONSTRAINT phpbb_posts_enable_magic_url_check CHECK ((enable_magic_url >= 0)),
+    CONSTRAINT phpbb_posts_enable_sig_check CHECK ((enable_sig >= 0)),
+    CONSTRAINT phpbb_posts_enable_smilies_check CHECK ((enable_smilies >= 0)),
+    CONSTRAINT phpbb_posts_forum_id_check CHECK ((forum_id >= 0)),
+    CONSTRAINT phpbb_posts_icon_id_check CHECK ((icon_id >= 0)),
+    CONSTRAINT phpbb_posts_post_attachment_check CHECK ((post_attachment >= 0)),
+    CONSTRAINT phpbb_posts_post_delete_time_check CHECK ((post_delete_time >= 0)),
+    CONSTRAINT phpbb_posts_post_delete_user_check CHECK ((post_delete_user >= 0)),
+    CONSTRAINT phpbb_posts_post_delete_user_check1 CHECK ((post_delete_user >= 0)),
+    CONSTRAINT phpbb_posts_post_edit_count_check CHECK ((post_edit_count >= 0)),
+    CONSTRAINT phpbb_posts_post_edit_locked_check CHECK ((post_edit_locked >= 0)),
+    CONSTRAINT phpbb_posts_post_edit_time_check CHECK ((post_edit_time >= 0)),
+    CONSTRAINT phpbb_posts_post_edit_user_check CHECK ((post_edit_user >= 0)),
+    CONSTRAINT phpbb_posts_post_edit_user_check1 CHECK ((post_edit_user >= 0)),
+    CONSTRAINT phpbb_posts_post_id_check CHECK ((post_id >= 0)),
+    CONSTRAINT phpbb_posts_post_postcount_check CHECK ((post_postcount >= 0)),
+    CONSTRAINT phpbb_posts_post_reported_check CHECK ((post_reported >= 0)),
+    CONSTRAINT phpbb_posts_post_time_check CHECK ((post_time >= 0)),
+    CONSTRAINT phpbb_posts_poster_id_check CHECK ((poster_id >= 0)),
+    CONSTRAINT phpbb_posts_poster_id_check1 CHECK ((poster_id >= 0)),
+    CONSTRAINT phpbb_posts_topic_id_check CHECK ((topic_id >= 0)),
+    CONSTRAINT phpbb_posts_topic_id_check1 CHECK ((topic_id >= 0))
+);
+ALTER TABLE ONLY phpbb_posts
+    ADD CONSTRAINT phpbb_posts_pkey PRIMARY KEY (post_id);
+CREATE INDEX phpbb_posts_forum_id ON phpbb_posts USING btree (forum_id);
+CREATE INDEX phpbb_posts_post_username ON phpbb_posts USING btree (post_username);
+CREATE INDEX phpbb_posts_post_visibility ON phpbb_posts USING btree (post_visibility);
+CREATE INDEX phpbb_posts_poster_id ON phpbb_posts USING btree (poster_id);
+CREATE INDEX phpbb_posts_poster_ip ON phpbb_posts USING btree (poster_ip);
+CREATE INDEX phpbb_posts_simple_post_content ON phpbb_posts USING gin (to_tsvector('simple'::regconfig, ((post_text || ' '::text) || (post_subject)::text)));
+CREATE INDEX phpbb_posts_simple_post_subject ON phpbb_posts USING gin (to_tsvector('simple'::regconfig, (post_subject)::text));
+CREATE INDEX phpbb_posts_tid_post_time ON phpbb_posts USING btree (topic_id, post_time);
+CREATE INDEX phpbb_posts_topic_id ON phpbb_posts USING btree (topic_id);
+
+
+
