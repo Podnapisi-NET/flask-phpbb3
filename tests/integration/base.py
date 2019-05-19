@@ -125,7 +125,7 @@ def _create_session(cursor, session_id, user_id):
 def _create_global_topics(cursor):
     # type: (psycopg2.extensions.cursor) -> None
     cursor.execute(
-        "insert into"         
+        "insert into"
         " phpbb_topics(topic_id, forum_id, topic_title, topic_time,"
         "  topic_first_poster_name, topic_first_post_id, topic_type)"
         " values (0,0,'naslov_teme_0',10,'ime',0,3),"
