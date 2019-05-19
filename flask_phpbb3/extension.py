@@ -230,11 +230,11 @@ class PhpBB3(object):
 
     def fetch_global_topics(
             self,
-            forum_id=0,
-            skip=0,
-            limit=10,
-            cache=False,
-            cache_ttl=None,
+            forum_id=0,  # type: int
+            skip=0,  # type: int
+            limit=10,  # type: int
+            cache=False,  # type: bool
+            cache_ttl=None,  # type: typing.Optional[int]
     ):
         # type: (...) -> typing.Optional[dict]
         output = self._backend.execute(
