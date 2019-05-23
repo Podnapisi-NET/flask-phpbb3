@@ -107,11 +107,11 @@ class TestFetch(base.TestWithDatabase):
                                 'post_subject': 'topic three',
                                 'post_text': 'hello times four'}]),
                            (4, [{
-                                'topic_id':4,
-                                'forum_id':2,
+                                'topic_id': 4,
+                                'forum_id': 2,
                                 'topic_title': 'topic missing',
                                 'topic_time': 666,
-                                'topic_first_poster_name': 'not existent forum',
+                                'topic_first_poster_name': 'no forum',
                                 'post_subject': 'topic yes, forum no',
                                 'post_text': 'test case'}]),
                            (5, [{
@@ -127,7 +127,7 @@ class TestFetch(base.TestWithDatabase):
                                'random_column': 0,
                                'topic_title': 'topic missing',
                                'topic_time': 777,
-                               'dont_change_all': 'not existent forum',
+                               'do not_change_all': 'not existent forum',
                                'post_subject': 'topic yes, forum no',
                                'post_text': 'test case'}]),
                            (7, [1, 2, 3])
