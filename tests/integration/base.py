@@ -126,7 +126,7 @@ def _create_global_topics(cursor):
     # type: (psycopg2.extensions.cursor) -> None
 
     cursor.execute(
-     "insert into phpbb_topics ("
+        "insert into phpbb_topics ("
         "topic_id"
         ",forum_id"
         ",topic_title"
