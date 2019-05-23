@@ -127,7 +127,7 @@ class TestFetch(base.TestWithDatabase):
                                'random_column': 0,
                                'topic_title': 'topic missing',
                                'topic_time': 777,
-                               'do not_change_all': 'not existent forum',
+                               'do_not_change_all': 'not existent forum',
                                'post_subject': 'topic yes, forum no',
                                'post_text': 'test case'}]),
                            (7, [1, 2, 3])
