@@ -181,6 +181,14 @@ def _create_global_topics(cursor):
         ",'posted as 7, expecting 6'"
         ",3"
         ",3"
+        ") , ("
+        "7"
+        ",0"
+        ",'different data type'"
+        ",999"
+        ",'inserted into table, expecting different type'"
+        ",3"
+        ",3"
         ")"
         )
 
