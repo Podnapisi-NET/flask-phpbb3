@@ -12,7 +12,7 @@ import psycopg2.extensions
 import psycopg2.extras
 
 
-DB_HOST = '127.0.0.1'
+DB_HOST = '0.0.0.0'
 DB_ROOT_USER = 'postgres'
 DB_USER = 'phpbb3_test'
 DB_NAME = 'phpbb3_test'
