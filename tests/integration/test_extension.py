@@ -141,7 +141,7 @@ class TestFetch(base.TestWithDatabase):
     def test_fetch_global_topics_not_global_topic(self):
         # type () -> None
         base._create_global_topics(self.cursor)
-        skip=6
+        skip = 6
         topic = self.app.phpbb3.fetch_global_topics(
             skip=skip,
             limit=1,
