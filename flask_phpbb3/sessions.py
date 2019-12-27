@@ -147,6 +147,12 @@ class PhpBB3SessionInterface(flask.sessions.SessionInterface):
         output = app.phpbb3_cache  # type: werkzeug.contrib.cache.BaseCache
         return output
 
+    def _is_bot(self, app, request):
+        for user_agent in app.config['PHPBB3_BOTLIST']:
+            if request.headers.get('User-Agent', '').startswith(user_agent):
+                return True
+        return False
+
     def open_session(self, app, request):
         # type: (flask.Flask, flask.wrappers.Request) -> PhpBB3Session
         cookie_name = app.config.get('PHPBB3_COOKIE_NAME', 'phpbb3_')
@@ -161,7 +167,9 @@ class PhpBB3SessionInterface(flask.sessions.SessionInterface):
             session_id = None
 
         user = None
-        if session_id:
+        if self._is_bot(app, request):
+            user = {'user_id': 1, 'username': 'Anonymous'}
+        elif session_id:
             # Try to fetch session
             user = phpbb3.get_session(session_id=session_id)
             if user and 'username' in user:
