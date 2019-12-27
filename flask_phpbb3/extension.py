@@ -72,6 +72,7 @@ class PhpBB3(object):
         app.config['PHPBB3_DATABASE'].setdefault('CUSTOM_STATEMENTS', {})
         app.config.setdefault('PHPBB3_SESSION_BACKEND', {})
         app.config['PHPBB3_SESSION_BACKEND'].setdefault('TYPE', 'simple')
+        app.config.setdefault('PHPBB3_BOTLIST', [])
 
         # Conditional defaults
         if app.config['PHPBB3_SESSION_BACKEND']['TYPE'] == 'memcached':
